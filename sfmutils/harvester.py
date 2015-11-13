@@ -11,7 +11,7 @@ import hashlib
 import codecs
 import argparse
 import sys
-from collections import Counter
+from collections import Counter, namedtuple
 from sfmutils.state_store import JsonHarvestStateStore
 from sfmutils.warcprox import warced
 from sfmutils.utils import safe_string
@@ -116,38 +116,41 @@ class Msg():
             "message": self.message
         }
 
+MqConfig = namedtuple("MqConfig", ["host", "username", "password", "exchange", "queue", "routing_keys"])
+
 EXCHANGE = "sfm_exchange"
 
 
 class BaseHarvester():
-    def __init__(self, host, username, password, exchange, queue, routing_keys, skip_connection=False):
-        self.queue = queue
-        self.exchange = exchange
+    def __init__(self, mq_config=None):
+        self.mq_config = mq_config
 
         #Creating a connection can be skipped for testing purposes
-        if not skip_connection:
-            credentials = pika.PlainCredentials(username, password)
-            parameters = pika.ConnectionParameters(host=host, credentials=credentials)
+        if mq_config:
+            credentials = pika.PlainCredentials(mq_config.username, mq_config.password)
+            parameters = pika.ConnectionParameters(host=mq_config.host, credentials=credentials)
             self._connection = pika.BlockingConnection(parameters)
             channel = self._connection.channel()
             #Declare sfm_exchange
-            channel.exchange_declare(exchange=exchange,
+            channel.exchange_declare(exchange=mq_config.exchange,
                                      type="topic", durable=True)
             #Declare harvester queue
-            channel.queue_declare(queue=queue,
+            channel.queue_declare(queue=mq_config.queue,
                                   durable=True)
             #Bind
-            for routing_key in routing_keys:
-                channel.queue_bind(exchange=exchange,
-                                   queue=queue, routing_key=routing_key)
+            for routing_key in mq_config.routing_keys:
+                channel.queue_bind(exchange=mq_config.exchange,
+                                   queue=mq_config.queue, routing_key=routing_key)
 
             channel.close()
 
     def consume(self):
+        assert self.mq_config
+        assert self._connection
         channel = self._connection.channel()
         channel.basic_qos(prefetch_count=1)
-        log.info("Waiting for messages from %s", self.queue)
-        channel.basic_consume(self._callback, queue=self.queue)
+        log.info("Waiting for messages from %s", self.mq_config.queue)
+        channel.basic_consume(self._callback, queue=self.mq_config.queue)
         channel.start_consuming()
 
     def _callback(self, channel, method, _, body):
@@ -270,8 +273,9 @@ class BaseHarvester():
     def _publish_message(self, routing_key, message, channel):
         message_body = json.dumps(message, indent=4)
         if channel:
+            assert self.mq_config
             log.debug("Sending message to sfm_exchange with routing_key %s. The body is: %s", routing_key, message_body)
-            channel.basic_publish(exchange=self.exchange,
+            channel.basic_publish(exchange=self.mq_config.exchange,
                                   routing_key=routing_key,
                                   properties=pika.BasicProperties(content_type="application/json",
                                                                   delivery_mode=2),
@@ -354,10 +358,10 @@ class BaseHarvester():
         args = parser.parse_args()
 
         if args.command == "service":
-            harvester = cls(args.host, args.username, args.password, EXCHANGE, queue, routing_keys)
+            harvester = cls(mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE, queue, routing_keys))
             harvester.consume()
         elif args.command == "seed":
-            harvester = cls(None, None, None, None, None, None, skip_connection=True)
+            harvester = cls()
             result = harvester.harvest_from_file(args.filepath)
             if result:
                 log.info("Result is: %s", result)

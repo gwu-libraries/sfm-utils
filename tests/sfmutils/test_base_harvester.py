@@ -9,7 +9,7 @@ import shutil
 from unittest import TestCase
 from sfmutils.harvester import BaseHarvester
 from sfmutils.state_store import NullHarvestStateStore
-from sfmutils.harvester import HarvestResult, Msg
+from sfmutils.harvester import HarvestResult, Msg, MqConfig
 from sfmutils.warcprox import warced
 
 
@@ -21,11 +21,12 @@ def fake_warc(path, filename):
 
 class TestableHarvester(BaseHarvester):
     def __init__(self, state_store, warc_dir):
-        BaseHarvester.__init__(self, None, None, None, "test_exchange", None, None, skip_connection=True)
+        BaseHarvester.__init__(self)
         self.state_store = state_store
         self.harvest_seeds_state_store = None
         self.harvest_seeds_message = None
         self.warc_dir = warc_dir
+        self.mq_config = MqConfig(None, None, None, "test_exchange", None, None)
 
     def harvest_seeds(self, message, state_store):
         #Write a fake warc file
@@ -50,7 +51,8 @@ class TestableHarvester(BaseHarvester):
 
 class ExceptionRaisingHarvester(BaseHarvester):
     def __init__(self):
-        BaseHarvester.__init__(self, None, None, None, "test_exchange", None, None, skip_connection=True)
+        BaseHarvester.__init__(self)
+        self.mq_config = MqConfig(None, None, None, "test_exchange", None, None)
 
     def harvest_seeds(self, message, state_store):
         raise Exception("Darn!")
@@ -322,7 +324,7 @@ class TestBaseHarvester(TestCase):
         os.remove(message_filepath)
 
     def test_list_warcs(self):
-        harvester = BaseHarvester(None, None, None, None, None, None, skip_connection=True)
+        harvester = BaseHarvester()
         warc_dir = tempfile.mkdtemp()
         fake_warc(warc_dir, "test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000.warc.gz")
         fake_warc(warc_dir, "test_1-20151109195229879-00001-97528-GLSS-F0G5RP-8000.warc")
