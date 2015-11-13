@@ -11,8 +11,6 @@ A harvest state store keeps track of the state of harvesting of different types 
 For example, it might be used to keep track of the last tweet fetched from a user timeline.
 
 A harvest state store should implement the signature of DictHarvestStateStore.
-
-The behavior of the harvest state store after close() is called is unspecified.
 """
 
 
@@ -60,37 +58,34 @@ class DictHarvestStateStore():
                 if not self._state[resource_type]:
                     del self._state[resource_type]
 
-    def close(self):
-        """
-        Close the harvest state store.
-
-        Close should be called when the harvest state store is no longer needed.
-        """
-        pass
-
 
 class JsonHarvestStateStore(DictHarvestStateStore):
     """
     A harvest state store implementation backed by a dictionary and stored as JSON.
 
-    The JSON is written to <collection_path>/state.json.
+    The JSON is written to <collection_path>/state.json. It is loaded and saved on
+    every get and set.
     """
-    def __init__(self, collection_path, load_existing=True, persist_on_close=True):
+    def __init__(self, collection_path):
         DictHarvestStateStore.__init__(self)
-        #Load state.  State is what has already been processed from a feed.
+
+        self.collection_path = collection_path
         self.state_filepath = os.path.join(collection_path, "state.json")
-        if load_existing and os.path.exists(self.state_filepath):
-            log.debug("Loading state from %s", self.state_filepath)
+
+    def _load_state(self):
+        if os.path.exists(self.state_filepath):
             with codecs.open(self.state_filepath, "r") as state_file:
                 self._state = json.load(state_file)
 
-        self.persist_on_close = persist_on_close
+    def get_state(self, resource_type, key):
+        self._load_state()
+        return DictHarvestStateStore.get_state(self, resource_type, key)
 
-    def close(self):
-        if self.persist_on_close:
-            log.debug("Storing harvest state to %s", self.state_filepath)
-            with codecs.open(self.state_filepath, 'w') as state_file:
-                json.dump(self._state, state_file)
+    def set_state(self, resource_type, key, value):
+        self._load_state()
+        DictHarvestStateStore.set_state(self, resource_type, key, value)
+        with codecs.open(self.state_filepath, 'w') as state_file:
+            json.dump(self._state, state_file)
 
 
 class NullHarvestStateStore():
@@ -105,7 +100,4 @@ class NullHarvestStateStore():
         return None
 
     def set_state(self, resource_type, key, value):
-        pass
-
-    def close(self):
         pass
