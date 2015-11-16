@@ -11,6 +11,8 @@ import hashlib
 import codecs
 import argparse
 import sys
+import threading
+import signal
 from collections import Counter, namedtuple
 from sfmutils.state_store import JsonHarvestStateStore
 from sfmutils.warcprox import warced
@@ -120,8 +122,7 @@ MqConfig = namedtuple("MqConfig", ["host", "username", "password", "exchange", "
 
 EXCHANGE = "sfm_exchange"
 
-
-class BaseHarvester():
+class BaseConsumer():
     def __init__(self, mq_config=None):
         self.mq_config = mq_config
 
@@ -134,20 +135,22 @@ class BaseHarvester():
             #Declare sfm_exchange
             channel.exchange_declare(exchange=mq_config.exchange,
                                      type="topic", durable=True)
-            #Declare harvester queue
-            channel.queue_declare(queue=mq_config.queue,
-                                  durable=True)
-            #Bind
-            for routing_key in mq_config.routing_keys:
-                channel.queue_bind(exchange=mq_config.exchange,
-                                   queue=mq_config.queue, routing_key=routing_key)
-
             channel.close()
 
     def consume(self):
         assert self.mq_config
         assert self._connection
+
         channel = self._connection.channel()
+
+        #Declare harvester queue
+        channel.queue_declare(queue=self.mq_config.queue,
+                              durable=True)
+        #Bind
+        for routing_key in self.mq_config.routing_keys:
+            channel.queue_bind(exchange=self.mq_config.exchange,
+                               queue=self.mq_config.queue, routing_key=routing_key)
+
         channel.basic_qos(prefetch_count=1)
         log.info("Waiting for messages from %s", self.mq_config.queue)
         channel.basic_consume(self._callback, queue=self.mq_config.queue)
@@ -160,90 +163,170 @@ class BaseHarvester():
         Note that channel and method can be None to allow invoking from a
         non-mq environment.
         """
-        log.info("Harvesting by message")
-
-        #This way we can just use channel as a test
-        if method is None:
-            channel = None
+        self.channel = channel
+        self.routing_key = method.routing_key
+        self.message_body = body
 
         #Acknowledge the message
         if channel:
             log.debug("Acking message")
             channel.basic_ack(delivery_tag=method.delivery_tag)
 
-        start_date = datetime.datetime.now()
-        message = json.loads(body)
-        log.debug("Message is %s" % json.dumps(message, indent=4))
-        harvest_id = message["id"]
-        collection_id = message["collection"]["id"]
-        collection_path = message["collection"]["path"]
+        self.harvest()
 
-        prefix = safe_string(harvest_id)
+    def harvest(self):
+        pass
+
+
+class BaseHarvester(BaseConsumer):
+    def __init__(self, mq_config=None, process_interval_secs=1200):
+        BaseConsumer.__init__(self, mq_config)
+        self.process_interval_secs = process_interval_secs
+
+        self.is_streaming = False
+        self.harvest_result = None
+        self.harvest_result_lock = None
+        self.message_body = None
+        self.message = None
+        self.channel = None
+        # self.method = None
+        self.routing_key = ""
+        self.warc_temp_dir = None
+        self.stop_event = None
+        self.process_timer = None
+        self.state_store = None
+
+    def harvest(self):
+        assert self.message_body
+
+        log.info("Harvesting by message")
+
+        self.harvest_result = HarvestResult()
+        self.harvest_result.started = datetime.datetime.now()
+        self.harvest_result_lock = threading.Lock()
+        self.stop_event = threading.Event()
+
+        def set_stop_event(signal_number, stack_frame):
+            self.stop_event.set()
+
+        signal.signal(signal.SIGTERM, set_stop_event)
+        signal.signal(signal.SIGINT, set_stop_event)
+
+        self.message = json.loads(self.message_body)
+        log.debug("Message is %s" % json.dumps(self.message, indent=4))
+
+        prefix = safe_string(self.message["id"])
         #Create a temp directory for WARCs
-        warc_temp_dir = tempfile.mkdtemp(prefix=prefix)
-        state_store = self.get_state_store(message)
+        self.warc_temp_dir = tempfile.mkdtemp(prefix=prefix)
+        self._create_state_store()
+
+        #Setup the process timer
+        def process_it(h):
+            h._process(done=False)
+            h.process_timer = threading.Timer(h.process_interval_secs, process_it, args=[h])
+            h.process_timer.start()
+        if self.is_streaming:
+            self.process_timer = threading.Timer(self.process_interval_secs, process_it, args=[self])
+            self.process_timer.start()
+
         try:
-            with warced(prefix, warc_temp_dir):
-                harvest_result = self.harvest_seeds(message, state_store)
+            with warced(prefix, self.warc_temp_dir):
+                self.harvest_seeds()
         except Exception as e:
             log.exception(e)
-            harvest_result = HarvestResult()
-            harvest_result.success = False
-            harvest_result.errors.append(Msg(CODE_UNKNOWN_ERROR, str(e)))
-        harvest_result.started = start_date
-        harvest_result.ended = datetime.datetime.now()
+            self.harvest_result.success = False
+            self.harvest_result.errors.append(Msg(CODE_UNKNOWN_ERROR, str(e)))
+        self.harvest_result.ended = datetime.datetime.now()
+        if self.process_timer:
+            self.process_timer.cancel()
 
-        if harvest_result.success:
-            #Send web harvest message
-            self._send_web_harvest_message(channel, harvest_id, collection_id,
-                                           collection_path, harvest_result.urls_as_set())
-            #Process warc files
-            for warc_filename in self._list_warcs(warc_temp_dir):
-                #Move the warc
-                dest_warc_filepath = self._move_file(warc_filename,
-                                                     warc_temp_dir, self._path_for_warc(collection_path, warc_filename))
-                harvest_result.warcs.append(dest_warc_filepath)
-                #Send warc created message
-                self._send_warc_created_message(channel, collection_id, collection_path, self._warc_id(warc_filename),
-                                                dest_warc_filepath)
+        self._process()
 
         #Delete temp dir
-        if os.path.exists(warc_temp_dir):
-            shutil.rmtree(warc_temp_dir)
-        #Close state store
-        state_store.close()
-        self._send_status_message(channel, method.routing_key if method else "", harvest_id, harvest_result)
-        return harvest_result
+        if os.path.exists(self.warc_temp_dir):
+            shutil.rmtree(self.warc_temp_dir)
 
-    def harvest_from_file(self, filepath):
+    def _process(self, done=True):
+        harvest_id = self.message["id"]
+        collection_id = self. message["collection"]["id"]
+        collection_path = self.message["collection"]["path"]
+
+        #Acquire a lock
+        with self.harvest_result_lock:
+            if self.harvest_result.success:
+                #Send web harvest message
+                self._send_web_harvest_message(self.channel, harvest_id, collection_id,
+                                               collection_path, self.harvest_result.urls_as_set())
+                #Since the urls were sent, clear them
+                if not done:
+                    self.harvest_result.urls = []
+
+                #Process warc files
+                for warc_filename in self._list_warcs(self.warc_temp_dir):
+                    #Move the warc
+                    dest_warc_filepath = self._move_file(warc_filename,
+                                                         self.warc_temp_dir,
+                                                         self._path_for_warc(collection_path, warc_filename))
+                    self.harvest_result.warcs.append(dest_warc_filepath)
+                    #Send warc created message
+                    self._send_warc_created_message(self.channel, collection_id, collection_path,
+                                                    self._warc_id(warc_filename), dest_warc_filepath)
+
+            #TODO: Persist summary so that can resume
+
+            status = STATUS_SUCCESS if self.harvest_result.success else STATUS_FAILURE
+            if not self.harvest_result.success:
+                status = STATUS_FAILURE
+            elif not done:
+                status = STATUS_RUNNING
+            else:
+                status = STATUS_SUCCESS
+            self._send_status_message(self.channel, self.routing_key, harvest_id,
+                                  self.harvest_result, status)
+            if not done:
+                #Since these were sent, clear them.
+                self.harvest_result.errors = []
+                self.harvest_result.infos = []
+                self.harvest_result.warnings = []
+                self.harvest_result.token_updates = []
+                self.harvest_result.uids = []
+
+    def harvest_from_file(self, filepath, routing_key=None, is_streaming=False):
         """
         Performs a harvest based on the a harvest start message contained in the
         provided filepath.
 
-        No additional messages are sent, but state is updated.
+        SIGTERM or SIGINT (Ctrl+C) will interrupt.
 
         :param filepath: filepath of the harvest start message
-        :return: the HarvestResult
+        :param routing_key: routing key of the harvest start message
+        :param is_streaming: True to run in streaming mode
         """
         log.debug("Harvesting from file %s", filepath)
         with codecs.open(filepath, "r") as f:
-            body = f.read()
-        return self._callback(None, None, None, body)
+            self.message_body = f.read()
 
-    def harvest_seeds(self, message, state_store):
+        self.routing_key = routing_key or ""
+        self.is_streaming = is_streaming
+
+        if self.mq_config:
+            self.channel = self._connection.channel()
+        self.harvest()
+        if self.channel:
+            self.channel.close()
+        return self.harvest_result
+
+    def harvest_seeds(self):
         """
         Performs a harvest based on the seeds contained in the message.
-        :param message: the message
-        :param state_store: a state store
-        :return: a HarvestResult
         """
         pass
 
-    def get_state_store(self, message):
+    def _create_state_store(self):
         """
-        Gets a state store for the harvest.
+        Creates a state store for the harvest.
         """
-        return JsonHarvestStateStore(message["collection"]["path"])
+        self.state_store = JsonHarvestStateStore(self.message["collection"]["path"])
 
     @staticmethod
     def _list_warcs(path):
@@ -286,6 +369,7 @@ class BaseHarvester():
 
     def _send_web_harvest_message(self, channel, harvest_id, collection_id, collection_path, urls):
         message = {
+            #TODO: Make this unique when multiple web harvest messages are sent.
             #This will be unique
             "id": "{}:{}".format(self.__class__.__name__, harvest_id),
             "parent_id": harvest_id,
@@ -301,20 +385,21 @@ class BaseHarvester():
 
         self._publish_message("harvest.start.web", message, channel)
 
-    def _send_status_message(self, channel, harvest_routing_key, harvest_id, harvest_result):
+    def _send_status_message(self, channel, harvest_routing_key, harvest_id, harvest_result, status):
         #Just add additional info to job message
         message = {
             "id": harvest_id,
-            "status": STATUS_SUCCESS if harvest_result.success else STATUS_FAILURE,
+            "status": status,
             "infos": [msg.to_map() for msg in harvest_result.infos],
             "warnings": [msg.to_map() for msg in harvest_result.warnings],
             "errors": [msg.to_map() for msg in harvest_result.errors],
             "date_started": harvest_result.started.isoformat(),
-            "date_ended": harvest_result.ended.isoformat(),
             "summary": harvest_result.summary,
             "token_updates": harvest_result.token_updates,
             "uids": harvest_result.uids
         }
+        if harvest_result.ended:
+            message["date_ended"] = harvest_result.ended.isoformat(),
 
         #Routing key may be none
         status_routing_key = harvest_routing_key.replace("start", "status")
@@ -354,6 +439,11 @@ class BaseHarvester():
 
         seed_parser = subparsers.add_parser("seed", help="Harvest based on a seed file.")
         seed_parser.add_argument("filepath", help="Filepath of the seed file.")
+        seed_parser.add_argument("--streaming", action="store_true", help="Run in streaming mode.")
+        seed_parser.add_argument("--host")
+        seed_parser.add_argument("--username")
+        seed_parser.add_argument("--password")
+        seed_parser.add_argument("--routing-key")
 
         args = parser.parse_args()
 
@@ -361,11 +451,11 @@ class BaseHarvester():
             harvester = cls(mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE, queue, routing_keys))
             harvester.consume()
         elif args.command == "seed":
-            harvester = cls()
-            result = harvester.harvest_from_file(args.filepath)
-            if result:
-                log.info("Result is: %s", result)
+            harvester = cls(mq_config=MqConfig(args.host, args.username, args.password, None, None, None) if args.routing_key else None)
+            harvester.harvest_from_file(args.filepath, routing_key=args.routing_key, is_streaming=args.streaming)
+            if harvester.harvest_result:
+                log.info("Result is: %s", harvester.harvest_result)
                 sys.exit(0)
             else:
-                log.warning("Result is: %s", result)
+                log.warning("Result is: %s", harvester.harvest_result)
                 sys.exit(1)

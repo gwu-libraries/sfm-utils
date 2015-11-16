@@ -35,9 +35,6 @@ class TestJsonHarvestStateStore(TestCase):
         self.store.set_state("resource_type1", "key1", "value1")
         self.assertEqual("value1", self.store.get_state("resource_type1", "key1"), "Retrieved state not value1")
 
-        #Close the store
-        self.store.close()
-
         #Create a new store and test for value
         self.store = JsonHarvestStateStore(self.collection_path)
         self.assertEqual("value1", self.store.get_state("resource_type1", "key1"), "Retrieved state not value1")
