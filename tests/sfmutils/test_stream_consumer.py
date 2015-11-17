@@ -5,14 +5,14 @@ import json
 import socket
 from sfmutils.stream_consumer import StreamConsumer
 from sfmutils.harvester import MqConfig
-from sfmutils.supervisor import Supervisor
+from sfmutils.supervisor import HarvestSupervisor
 
 
 class TestStreamConsumer(TestCase):
     def setUp(self):
-        self.patcher = patch("sfmutils.stream_consumer.Supervisor")
+        self.patcher = patch("sfmutils.stream_consumer.HarvestSupervisor")
         mock_supervisor_class = self.patcher.start()
-        self.mock_supervisor = MagicMock(spec=Supervisor)
+        self.mock_supervisor = MagicMock(spec=HarvestSupervisor)
         mock_supervisor_class.side_effect = [self.mock_supervisor]
         self.stream_consumer = StreamConsumer(MqConfig(None, None, None, None,
                                                        {"test_queue": [

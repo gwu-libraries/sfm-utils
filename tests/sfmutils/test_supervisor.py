@@ -6,17 +6,13 @@ import json
 from unittest import TestCase
 from mock import patch, MagicMock
 from xmlrpclib import ServerProxy
-from sfmutils.supervisor import Supervisor
+from sfmutils.supervisor import HarvestSupervisor
 
 
-class TestSupervisor(TestCase):
+class TestHarvestSupervisor(TestCase):
 
     @patch("sfmutils.supervisor.xmlrpclib.ServerProxy", autospec=True)
     def test_supervisor_start_and_stop(self, mock_server_proxy_class):
-# class Supervisor():
-#     def __init__(self, script, mq_host, mq_username, mq_password,
-#                  process_owner=None, python_executable="python", log_path="/var/log/sfm",
-#                  conf_path="/etc/sfm_supervisor", internal_ip="127.0.0.1", socket_file="/var/run/supervisor.sock"):
         message = {
             "id": "test:1",
             "collection": {
@@ -44,7 +40,7 @@ class TestSupervisor(TestCase):
         mock_server_proxy_class.side_effect = [mock_server_proxy1, mock_server_proxy2, mock_server_proxy3,
                                                mock_server_proxy4]
 
-        supervisor = Supervisor("/opt/sfm/test_harvester.py", "test_host", "test_user", "test_password",
+        supervisor = HarvestSupervisor("/opt/sfm/test_harvester.py", "test_host", "test_user", "test_password",
                                 conf_path=conf_path)
 
         #Conf_path is empty

@@ -3,8 +3,8 @@ import socket
 import logging
 import json
 import argparse
-from .harvester import BaseConsumer, MqConfig, EXCHANGE
-from .supervisor import Supervisor
+from sfmutils.harvester import BaseConsumer, MqConfig, EXCHANGE
+from sfmutils.supervisor import HarvestSupervisor
 
 log = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class StreamConsumer(BaseConsumer):
             log.debug("Queues are now %s", mq_config.queues)
 
         self.message = None
-        self._supervisor = Supervisor(script, mq_config.host, mq_config.username, mq_config.password)
+        self._supervisor = HarvestSupervisor(script, mq_config.host, mq_config.username, mq_config.password)
 
     def harvest(self):
         self.message = json.loads(self.message_body)

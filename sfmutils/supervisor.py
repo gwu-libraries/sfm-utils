@@ -12,7 +12,7 @@ from sfmutils.utils import safe_string
 log = logging.getLogger(__name__)
 
 
-class Supervisor():
+class HarvestSupervisor():
     def __init__(self, script, mq_host, mq_username, mq_password,
                  process_owner=None, python_executable="python", log_path="/var/log/sfm",
                  conf_path="/etc/sfm_supervisor", internal_ip="127.0.0.1", socket_file="/var/run/supervisor.sock"):

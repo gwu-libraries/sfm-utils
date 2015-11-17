@@ -10,6 +10,7 @@ setup(
     description="Utilities to support Social Feed Manager.",
     platforms=['POSIX'],
     test_suite='tests',
+    scripts=['sfmutils/stream_consumer.py'],
     install_requires=['requests>=2.7.0',
                       'warcprox',
                       'pika>=0.10.0',
