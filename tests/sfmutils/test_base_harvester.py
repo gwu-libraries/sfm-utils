@@ -21,7 +21,7 @@ def fake_warc(path, filename):
 
 class TestableHarvester(BaseHarvester):
     def __init__(self, state_store, warc_dir):
-        BaseHarvester.__init__(self)
+        BaseHarvester.__init__(self, MqConfig(None, None, None, "test_exchange", None, skip_connection=True))
         self.state_store = state_store
         self.warc_dir = warc_dir
 
@@ -43,8 +43,7 @@ class TestableHarvester(BaseHarvester):
 
 class ExceptionRaisingHarvester(BaseHarvester):
     def __init__(self):
-        BaseHarvester.__init__(self)
-        self.mq_config = MqConfig(None, None, None, "test_exchange", None, None)
+        BaseHarvester.__init__(self, MqConfig(None, None, None, "test_exchange", None, skip_connection=True))
 
     def harvest_seeds(self):
         raise Exception("Darn!")
@@ -52,10 +51,10 @@ class ExceptionRaisingHarvester(BaseHarvester):
 
 class TestableStreamHarvester(BaseHarvester):
     def __init__(self, state_store, warc_dir):
-        BaseHarvester.__init__(self, process_interval_secs=3)
+        BaseHarvester.__init__(self, MqConfig(None, None, None, "test_exchange", None, skip_connection=True), process_interval_secs=3)
         self.state_store = state_store
         self.warc_dir = warc_dir
-        self.mq_config = MqConfig(None, None, None, "test_exchange", None, None)
+        # self.mq_config = MqConfig(None, None, None, "test_exchange", None, None)
 
     def harvest_seeds(self):
         self.harvest_result.infos.append(Msg("FAKE_CODE1", "This is my message."))
@@ -108,7 +107,7 @@ class TestBaseHarvester(TestCase):
 
         #Create harvester and invoke _callback
         harvester = TestableHarvester(mock_state_store, test_warc_path)
-        harvester.mq_config = MqConfig(None, None, None, "test_exchange", None, None)
+        # harvester.mq_config = MqConfig(None, None, None, "test_exchange", None, None)
         harvester._callback(mock_channel, mock_method, None, json.dumps(message))
 
         #Test assertions
@@ -341,7 +340,7 @@ class TestBaseHarvester(TestCase):
         os.remove(message_filepath)
 
     def test_list_warcs(self):
-        harvester = BaseHarvester()
+        harvester = BaseHarvester(MqConfig(None, None, None, "test_exchange", None, skip_connection=True))
         warc_dir = tempfile.mkdtemp()
         fake_warc(warc_dir, "test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000.warc.gz")
         fake_warc(warc_dir, "test_1-20151109195229879-00001-97528-GLSS-F0G5RP-8000.warc")

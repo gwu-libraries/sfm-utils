@@ -13,7 +13,7 @@ import argparse
 import sys
 import threading
 import signal
-from collections import Counter, namedtuple
+from collections import Counter
 from sfmutils.state_store import JsonHarvestStateStore
 from sfmutils.warcprox import warced
 from sfmutils.utils import safe_string
@@ -118,16 +118,38 @@ class Msg():
             "message": self.message
         }
 
-MqConfig = namedtuple("MqConfig", ["host", "username", "password", "exchange", "queue", "routing_keys"])
+
+class MqConfig():
+    """
+    Configuration for connecting to RabbitMQ.
+    """
+    def __init__(self, host, username, password, exchange, queues, skip_connection=False):
+        """
+        :param host: the host
+        :param username: the username
+        :param password: the password
+        :param exchange: the exchange
+        :param queues: map of queue names to lists of routing keys
+        :param skip_connection: if True, skip creating connection (for testing)
+        """
+        self.host = host
+        self.username = username
+        self.password = password
+        self.exchange = exchange
+        self.queues = queues
+        self.skip_connection = skip_connection
+
 
 EXCHANGE = "sfm_exchange"
 
+
 class BaseConsumer():
-    def __init__(self, mq_config=None):
+    def __init__(self, mq_config):
         self.mq_config = mq_config
+        self._connection = None
 
         #Creating a connection can be skipped for testing purposes
-        if mq_config:
+        if not mq_config.skip_connection:
             credentials = pika.PlainCredentials(mq_config.username, mq_config.password)
             parameters = pika.ConnectionParameters(host=mq_config.host, credentials=credentials)
             self._connection = pika.BlockingConnection(parameters)
@@ -138,18 +160,18 @@ class BaseConsumer():
             channel.close()
 
     def consume(self):
-        assert self.mq_config
         assert self._connection
 
         channel = self._connection.channel()
 
-        #Declare harvester queue
-        channel.queue_declare(queue=self.mq_config.queue,
-                              durable=True)
-        #Bind
-        for routing_key in self.mq_config.routing_keys:
-            channel.queue_bind(exchange=self.mq_config.exchange,
-                               queue=self.mq_config.queue, routing_key=routing_key)
+        for queue, routing_keys in self.mq_config.queues.items():
+            #Declare harvester queue
+            channel.queue_declare(queue=queue,
+                                  durable=True)
+            #Bind
+            for routing_key in routing_keys:
+                channel.queue_bind(exchange=self.mq_config.exchange,
+                                   queue=queue, routing_key=routing_key)
 
         channel.basic_qos(prefetch_count=1)
         log.info("Waiting for messages from %s", self.mq_config.queue)
@@ -179,7 +201,7 @@ class BaseConsumer():
 
 
 class BaseHarvester(BaseConsumer):
-    def __init__(self, mq_config=None, process_interval_secs=1200):
+    def __init__(self, mq_config, process_interval_secs=1200):
         BaseConsumer.__init__(self, mq_config)
         self.process_interval_secs = process_interval_secs
 
@@ -189,7 +211,6 @@ class BaseHarvester(BaseConsumer):
         self.message_body = None
         self.message = None
         self.channel = None
-        # self.method = None
         self.routing_key = ""
         self.warc_temp_dir = None
         self.stop_event = None
@@ -309,7 +330,7 @@ class BaseHarvester(BaseConsumer):
         self.routing_key = routing_key or ""
         self.is_streaming = is_streaming
 
-        if self.mq_config:
+        if self._connection:
             self.channel = self._connection.channel()
         self.harvest()
         if self.channel:
@@ -356,7 +377,6 @@ class BaseHarvester(BaseConsumer):
     def _publish_message(self, routing_key, message, channel):
         message_body = json.dumps(message, indent=4)
         if channel:
-            assert self.mq_config
             log.debug("Sending message to sfm_exchange with routing_key %s. The body is: %s", routing_key, message_body)
             channel.basic_publish(exchange=self.mq_config.exchange,
                                   routing_key=routing_key,
@@ -448,10 +468,12 @@ class BaseHarvester(BaseConsumer):
         args = parser.parse_args()
 
         if args.command == "service":
-            harvester = cls(mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE, queue, routing_keys))
+            harvester = cls(MqConfig(args.host, args.username, args.password, EXCHANGE,
+                                               {queue: routing_keys}))
             harvester.consume()
         elif args.command == "seed":
-            harvester = cls(mq_config=MqConfig(args.host, args.username, args.password, None, None, None) if args.routing_key else None)
+            harvester = cls(MqConfig(args.host, args.username, args.password, None, None, None)
+                            if args.routing_key else None)
             harvester.harvest_from_file(args.filepath, routing_key=args.routing_key, is_streaming=args.streaming)
             if harvester.harvest_result:
                 log.info("Result is: %s", harvester.harvest_result)

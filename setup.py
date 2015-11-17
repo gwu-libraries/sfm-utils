@@ -12,7 +12,8 @@ setup(
     test_suite='tests',
     install_requires=['requests>=2.7.0',
                       'warcprox',
-                      'pika>=0.10.0'],
+                      'pika>=0.10.0',
+                      'supervisor>=3.1.3'],
     tests_require=['mock>=1.3.0'],
     dependency_links=['git+https://github.com/gwu-libraries/warcprox.git@master#egg=warcprox'],
     classifiers=[
