@@ -1,22 +1,25 @@
 from __future__ import absolute_import
 import logging
 import datetime
-import pika
 import json
 import tempfile
-import os
 import shutil
-import re
 import hashlib
-import codecs
 import argparse
 import sys
 import threading
 import signal
 from collections import Counter
+
+import pika
+import os
+import re
+import codecs
+from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
 from sfmutils.state_store import JsonHarvestStateStore
 from sfmutils.warcprox import warced
 from sfmutils.utils import safe_string
+
 
 log = logging.getLogger(__name__)
 
@@ -119,90 +122,6 @@ class Msg():
         }
 
 
-class MqConfig():
-    """
-    Configuration for connecting to RabbitMQ.
-    """
-    def __init__(self, host, username, password, exchange, queues, skip_connection=False):
-        """
-        :param host: the host
-        :param username: the username
-        :param password: the password
-        :param exchange: the exchange
-        :param queues: map of queue names to lists of routing keys
-        :param skip_connection: if True, skip creating connection (for testing)
-        """
-        self.host = host
-        self.username = username
-        self.password = password
-        self.exchange = exchange
-        self.queues = queues
-        self.skip_connection = skip_connection
-
-
-EXCHANGE = "sfm_exchange"
-
-
-class BaseConsumer():
-    def __init__(self, mq_config):
-        self.mq_config = mq_config
-        self._connection = None
-
-        #Creating a connection can be skipped for testing purposes
-        if not mq_config.skip_connection:
-            credentials = pika.PlainCredentials(mq_config.username, mq_config.password)
-            parameters = pika.ConnectionParameters(host=mq_config.host, credentials=credentials)
-            self._connection = pika.BlockingConnection(parameters)
-            channel = self._connection.channel()
-            #Declare sfm_exchange
-            channel.exchange_declare(exchange=mq_config.exchange,
-                                     type="topic", durable=True)
-            channel.close()
-
-    def consume(self):
-        assert self._connection
-
-        channel = self._connection.channel()
-
-        for queue, routing_keys in self.mq_config.queues.items():
-            #Declare harvester queue
-            channel.queue_declare(queue=queue,
-                                  durable=True)
-            #Bind
-            for routing_key in routing_keys:
-                channel.queue_bind(exchange=self.mq_config.exchange,
-                                   queue=queue, routing_key=routing_key)
-
-        channel.basic_qos(prefetch_count=1)
-        channel.basic_qos(prefetch_count=1, all_channels=True)
-        for queue in self.mq_config.queues.keys():
-            log.info("Waiting for messages from %s", queue)
-            channel.basic_consume(self._callback, queue=queue)
-
-        channel.start_consuming()
-
-    def _callback(self, channel, method, _, body):
-        """
-        Callback for receiving harvest message.
-
-        Note that channel and method can be None to allow invoking from a
-        non-mq environment.
-        """
-        self.channel = channel
-        self.routing_key = method.routing_key
-        self.message_body = body
-
-        #Acknowledge the message
-        if channel:
-            log.debug("Acking message")
-            channel.basic_ack(delivery_tag=method.delivery_tag)
-
-        self.harvest()
-
-    def harvest(self):
-        pass
-
-
 class BaseHarvester(BaseConsumer):
     def __init__(self, mq_config, process_interval_secs=1200):
         BaseConsumer.__init__(self, mq_config)
@@ -220,7 +139,7 @@ class BaseHarvester(BaseConsumer):
         self.process_timer = None
         self.state_store = None
 
-    def harvest(self):
+    def on_message(self):
         assert self.message_body
 
         log.info("Harvesting by message")
@@ -257,7 +176,7 @@ class BaseHarvester(BaseConsumer):
             with warced(prefix, self.warc_temp_dir):
                 self.harvest_seeds()
         except Exception as e:
-            log.exception(e)
+            log.exception("Unknown error raised during harvest")
             self.harvest_result.success = False
             self.harvest_result.errors.append(Msg(CODE_UNKNOWN_ERROR, str(e)))
         self.harvest_result.ended = datetime.datetime.now()
@@ -335,7 +254,7 @@ class BaseHarvester(BaseConsumer):
 
         if self._connection:
             self.channel = self._connection.channel()
-        self.harvest()
+        self.on_message()
         if self.channel:
             self.channel.close()
         return self.harvest_result

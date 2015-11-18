@@ -3,8 +3,8 @@ from unittest import TestCase
 from mock import MagicMock, patch
 import json
 import socket
+from sfmutils.consumer import MqConfig
 from sfmutils.stream_consumer import StreamConsumer
-from sfmutils.harvester import MqConfig
 from sfmutils.supervisor import HarvestSupervisor
 
 
@@ -40,7 +40,7 @@ class TestStreamConsumer(TestCase):
 
         self.stream_consumer.message_body = json.dumps(message)
         self.stream_consumer.routing_key = "harvest.start.test.test_usertimeline"
-        self.stream_consumer.harvest()
+        self.stream_consumer.on_message()
 
         self.mock_supervisor.start.called_once_with(message, "harvest.start.test.test_usertimeline")
 
@@ -51,6 +51,6 @@ class TestStreamConsumer(TestCase):
 
         self.stream_consumer.message_body = json.dumps(message)
         self.stream_consumer.routing_key = "harvest.stop.test.test_usertimeline"
-        self.stream_consumer.harvest()
+        self.stream_consumer.on_message()
 
         self.mock_supervisor.stop.called_once_with("test:1")

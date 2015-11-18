@@ -8,9 +8,10 @@ import shutil
 import threading
 from time import sleep
 from unittest import TestCase
+from sfmutils.consumer import MqConfig
 from sfmutils.harvester import BaseHarvester
 from sfmutils.state_store import NullHarvestStateStore
-from sfmutils.harvester import Msg, MqConfig
+from sfmutils.harvester import Msg
 from sfmutils.warcprox import warced
 
 

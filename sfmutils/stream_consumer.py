@@ -5,7 +5,7 @@ import socket
 import logging
 import json
 import argparse
-from sfmutils.harvester import BaseConsumer, MqConfig, EXCHANGE
+from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
 from sfmutils.supervisor import HarvestSupervisor
 
 log = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class StreamConsumer(BaseConsumer):
         self.message = None
         self._supervisor = HarvestSupervisor(script, mq_config.host, mq_config.username, mq_config.password)
 
-    def harvest(self):
+    def on_message(self):
         self.message = json.loads(self.message_body)
         harvest_id = self.message["id"]
         if self.routing_key.startswith("harvest.start."):
