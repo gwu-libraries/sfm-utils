@@ -174,8 +174,11 @@ class BaseConsumer():
                                    queue=queue, routing_key=routing_key)
 
         channel.basic_qos(prefetch_count=1)
-        log.info("Waiting for messages from %s", self.mq_config.queue)
-        channel.basic_consume(self._callback, queue=self.mq_config.queue)
+        channel.basic_qos(prefetch_count=1, all_channels=True)
+        for queue in self.mq_config.queues.keys():
+            log.info("Waiting for messages from %s", queue)
+            channel.basic_consume(self._callback, queue=queue)
+
         channel.start_consuming()
 
     def _callback(self, channel, method, _, body):
