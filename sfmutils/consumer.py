@@ -7,6 +7,15 @@ EXCHANGE = "sfm_exchange"
 
 
 class BaseConsumer():
+    """
+    Base class for consuming messages from Rabbit.
+
+    A BaseConsumer can be configured with an exchange and a mapping of
+    queues to routing keys. Exchanges, queues, and bindings will
+    be automatically created.
+
+    Subclasses should override on_message().
+    """
     def __init__(self, mq_config):
         self.mq_config = mq_config
         self._connection = None
@@ -63,6 +72,12 @@ class BaseConsumer():
         self.on_message()
 
     def on_message(self):
+        """
+        Override this class to consume message.
+
+        When called, self.channel, self.routing_key, and self.message_body
+        will be populated based on the new message.
+        """
         pass
 
 

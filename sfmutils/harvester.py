@@ -30,7 +30,7 @@ STATUS_RUNNING = "running"
 
 class HarvestResult():
     """
-    A data transfer object for keeping track of the results of a harvest.
+    Keeps track of the results of a harvest.
     """
     def __init__(self):
         self.success = True
@@ -107,7 +107,7 @@ class Msg():
     An informational, warning, or error message to be included in the harvest
     status.
 
-    Where possible, code should be selected from harvest.CODE_*.
+    Where possible, code should be selected from harvester.CODE_*.
     """
     def __init__(self, code, message):
         assert code
@@ -123,6 +123,14 @@ class Msg():
 
 
 class BaseHarvester(BaseConsumer):
+    """
+    Base class for a harvester, allowing harvesting from a queue or from a file.
+
+    Note that streams should only be harvested from a file as this does not support
+    harvest stop messages. (See sfm-utils.stream_consumer.StreamConsumer.)
+
+    Subclasses should overrride harvest_seeds().
+    """
     def __init__(self, mq_config, process_interval_secs=1200):
         BaseConsumer.__init__(self, mq_config)
         self.process_interval_secs = process_interval_secs
@@ -262,6 +270,9 @@ class BaseHarvester(BaseConsumer):
     def harvest_seeds(self):
         """
         Performs a harvest based on the seeds contained in the message.
+
+        When called, self.message_body, self.routing_key, self.channel,
+        and self.is_streaming will be populated.
         """
         pass
 
@@ -366,6 +377,18 @@ class BaseHarvester(BaseConsumer):
 
     @staticmethod
     def main(cls, queue, routing_keys):
+        """
+        A configurable main() for a harvester.
+
+        For example:
+            if __name__ == "__main__":
+                TwitterHarvester.main(TwitterHarvester, QUEUE, [ROUTING_KEY])
+
+        :param cls: the harvester class
+        :param queue: queue for the harvester
+        :param routing_keys: list of routing keys for the harvester
+        """
+
         #Logging
         logging.basicConfig(format='%(asctime)s: %(name)s --> %(message)s', level=logging.DEBUG)
 

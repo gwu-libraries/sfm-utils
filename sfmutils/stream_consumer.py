@@ -12,6 +12,15 @@ log = logging.getLogger(__name__)
 
 
 class StreamConsumer(BaseConsumer):
+    """
+    A consumer intende to control stream harvests using Supervisor.
+
+    When it receives a harvest start message, it starts a supervisor
+    process for harvesting the message.
+
+    When it receives a harvest stop message, it removes the supervisor process
+    for the harvest.
+    """
     def __init__(self, mq_config, script):
         BaseConsumer.__init__(self, mq_config)
         # Add routing keys for harvest stop messages
