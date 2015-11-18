@@ -452,6 +452,9 @@ class BaseHarvester(BaseConsumer):
 
         #Arguments
         parser = argparse.ArgumentParser()
+        parser.add_argument("--debug", action="store_true")
+        parser.add_argument("--debug-pika", action="store_true")
+
         subparsers = parser.add_subparsers(dest="command")
 
         service_parser = subparsers.add_parser("service", help="Run harvesting service that consumes messages from "
@@ -469,6 +472,11 @@ class BaseHarvester(BaseConsumer):
         seed_parser.add_argument("--routing-key")
 
         args = parser.parse_args()
+
+        #Logging
+        logging.basicConfig(format='%(asctime)s: %(name)s --> %(message)s',
+                            level=logging.DEBUG if args.debug or args.debug_pika else logging.INFO)
+        logging.getLogger("pika").setLevel(logging.debug if args.debug_pika else logging.INFO)
 
         if args.command == "service":
             harvester = cls(MqConfig(args.host, args.username, args.password, EXCHANGE,

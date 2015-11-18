@@ -40,9 +40,6 @@ class StreamConsumer(BaseConsumer):
             self._supervisor.stop(harvest_id)
 
 if __name__ == "__main__":
-    #Logging
-    logging.basicConfig(format='%(asctime)s: %(name)s --> %(message)s', level=logging.DEBUG)
-
     #Arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("host")
@@ -51,8 +48,15 @@ if __name__ == "__main__":
     parser.add_argument("queue")
     parser.add_argument("routing_keys", help="Comma separated list of routing keys")
     parser.add_argument("script")
+    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--debug-pika", action="store_true")
 
     args = parser.parse_args()
+
+    #Logging
+    logging.basicConfig(format='%(asctime)s: %(name)s --> %(message)s',
+                        level=logging.DEBUG if args.debug or args.debug_pika else logging.INFO)
+    logging.getLogger("pika").setLevel(logging.debug if args.debug_pika else logging.INFO)
 
     consumer = StreamConsumer(MqConfig(args.host, args.username, args.password, EXCHANGE,
                                            {args.queue: args.routing_keys.split(",")}), args.script)
