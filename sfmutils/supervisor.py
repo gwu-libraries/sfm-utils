@@ -31,6 +31,10 @@ class HarvestSupervisor():
             log.debug("Creating %s", self.conf_path)
             os.makedirs(self.conf_path)
 
+        if not os.path.exists(self.log_path):
+            log.debug("Creating %s", self.log_path)
+            os.makedirs(self.log_path)
+
     def start(self, harvest_start_message, routing_key):
         log.info("Starting %s", harvest_start_message)
         harvest_id = harvest_start_message["id"]
