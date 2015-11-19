@@ -396,6 +396,7 @@ class BaseHarvester(BaseConsumer):
         parser = argparse.ArgumentParser()
         parser.add_argument("--debug", action="store_true")
         parser.add_argument("--debug-pika", action="store_true")
+        parser.add_argument("--debug-http", action="store_true")
 
         subparsers = parser.add_subparsers(dest="command")
 
@@ -419,6 +420,9 @@ class BaseHarvester(BaseConsumer):
         logging.basicConfig(format='%(asctime)s: %(name)s --> %(message)s',
                             level=logging.DEBUG if args.debug or args.debug_pika else logging.INFO)
         logging.getLogger("pika").setLevel(logging.debug if args.debug_pika else logging.INFO)
+        logging.getLogger("requests").setLevel(logging.debug if args.debug_http else logging.INFO)
+        logging.getLogger("requests_oauthlib").setLevel(logging.debug if args.debug_http else logging.INFO)
+        logging.getLogger("oauthlib").setLevel(logging.debug if args.debug_http else logging.INFO)
 
         if args.command == "service":
             harvester = cls(MqConfig(args.host, args.username, args.password, EXCHANGE,
