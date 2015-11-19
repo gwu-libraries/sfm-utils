@@ -426,11 +426,10 @@ class BaseHarvester(BaseConsumer):
 
         if args.command == "service":
             harvester = cls(MqConfig(args.host, args.username, args.password, EXCHANGE,
-                                               {queue: routing_keys}))
+                                     {queue: routing_keys}))
             harvester.consume()
         elif args.command == "seed":
-            harvester = cls(MqConfig(args.host, args.username, args.password, None, None, None)
-                            if args.routing_key else None)
+            harvester = cls(MqConfig(args.host, args.username, args.password, EXCHANGE, None))
             harvester.harvest_from_file(args.filepath, routing_key=args.routing_key, is_streaming=args.streaming)
             if harvester.harvest_result:
                 log.info("Result is: %s", harvester.harvest_result)
