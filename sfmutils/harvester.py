@@ -131,7 +131,7 @@ class BaseHarvester(BaseConsumer):
 
     Subclasses should overrride harvest_seeds().
     """
-    def __init__(self, mq_config, process_interval_secs=1200):
+    def __init__(self, mq_config, process_interval_secs=1200, debug=False):
         BaseConsumer.__init__(self, mq_config)
         self.process_interval_secs = process_interval_secs
 
@@ -146,6 +146,7 @@ class BaseHarvester(BaseConsumer):
         self.stop_event = None
         self.process_timer = None
         self.state_store = None
+        self.debug = debug
 
     def on_message(self):
         assert self.message_body
@@ -181,7 +182,7 @@ class BaseHarvester(BaseConsumer):
             self.process_timer.start()
 
         try:
-            with warced(prefix, self.warc_temp_dir):
+            with warced(prefix, self.warc_temp_dir, debug=self.debug):
                 self.harvest_seeds()
         except Exception as e:
             log.exception("Unknown error raised during harvest")
@@ -426,10 +427,10 @@ class BaseHarvester(BaseConsumer):
 
         if args.command == "service":
             harvester = cls(MqConfig(args.host, args.username, args.password, EXCHANGE,
-                                     {queue: routing_keys}))
+                                     {queue: routing_keys}), debug=args.debug)
             harvester.consume()
         elif args.command == "seed":
-            harvester = cls(MqConfig(args.host, args.username, args.password, EXCHANGE, None))
+            harvester = cls(MqConfig(args.host, args.username, args.password, EXCHANGE, None), debug=args.debug)
             harvester.harvest_from_file(args.filepath, routing_key=args.routing_key, is_streaming=args.streaming)
             if harvester.harvest_result:
                 log.info("Result is: %s", harvester.harvest_result)

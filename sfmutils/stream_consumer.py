@@ -20,8 +20,10 @@ class StreamConsumer(BaseConsumer):
 
     When it receives a harvest stop message, it removes the supervisor process
     for the harvest.
+
+    Logs for the supervisor processes are in /var/log/sfm.
     """
-    def __init__(self, mq_config, script):
+    def __init__(self, mq_config, script, debug=False):
         BaseConsumer.__init__(self, mq_config)
         # Add routing keys for harvest stop messages
         # The queue will be unique to this instance of StreamServer so that it
@@ -33,7 +35,9 @@ class StreamConsumer(BaseConsumer):
             log.debug("Queues are now %s", mq_config.queues)
 
         self.message = None
-        self._supervisor = HarvestSupervisor(script, mq_config.host, mq_config.username, mq_config.password)
+        self.debug = debug
+        self._supervisor = HarvestSupervisor(script, mq_config.host, mq_config.username, mq_config.password,
+                                             debug=args.debug)
 
     def on_message(self):
         self.message = json.loads(self.message_body)
@@ -68,5 +72,5 @@ if __name__ == "__main__":
     logging.getLogger("pika").setLevel(logging.debug if args.debug_pika else logging.INFO)
 
     consumer = StreamConsumer(MqConfig(args.host, args.username, args.password, EXCHANGE,
-                                           {args.queue: args.routing_keys.split(",")}), args.script)
+                                           {args.queue: args.routing_keys.split(",")}), args.script, debug=args.debug)
     consumer.consume()

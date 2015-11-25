@@ -61,7 +61,7 @@ class warced():
     other configuration may be necessary for other HTTP libraries.
     """
     def __init__(self, prefix, directory, rollover_time=900, rollover_idle_time=930, record_size=1000*1000*100,
-                 record_rollover_time=5*60, compress=True, port=None):
+                 record_rollover_time=5*60, compress=True, port=None, debug=False):
         """
         :param prefix: prefix for the WARC filename.
         :param directory: directory into which to place the WARCS.
@@ -76,6 +76,7 @@ class warced():
         :param compress: gzip compress the WARC. Default is true.
         :param port: Port on which to run the proxy. If not provided, an open
         port will be selected.
+        :param debug: If True, runs warcprox with verbose option.
         """
         self.directory = directory
         self.prefix = prefix
@@ -88,6 +89,7 @@ class warced():
         self.warcprox = None
         self.ca_dir = tempfile.mkdtemp()
         self.ca_bundle = os.path.join(self.ca_dir, "warcprox-ca.pem")
+        self.debug = debug
 
     def __enter__(self):
         #Set environment variables that requests uses to configure proxy
@@ -139,6 +141,8 @@ class warced():
             cl += " -r {}".format(self.record_size)
         if self.record_rollover_time:
             cl += " --record-rollover-time {}".format(self.record_rollover_time)
+        if self.debug:
+            cl += " -v"
         return cl
 
     def __exit__(self, exc_type, exc_val, exc_tb):

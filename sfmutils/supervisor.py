@@ -15,7 +15,8 @@ log = logging.getLogger(__name__)
 class HarvestSupervisor():
     def __init__(self, script, mq_host, mq_username, mq_password,
                  process_owner=None, python_executable="python", log_path="/var/log/sfm",
-                 conf_path="/etc/supervisor/conf.d", internal_ip="127.0.0.1", socket_file="/var/run/supervisor.sock"):
+                 conf_path="/etc/supervisor/conf.d", internal_ip="127.0.0.1", socket_file="/var/run/supervisor.sock",
+                 debug=False):
         self.conf_path = conf_path
         self.process_owner = process_owner or getpass.getuser()
         self.python_executable = python_executable
@@ -26,6 +27,9 @@ class HarvestSupervisor():
         self.log_path = log_path
         self.internal_ip = internal_ip
         self.socket_file = socket_file
+        if debug:
+            log.info("Don't forget that log files are in %s", self.log_path)
+        self.debug = debug
 
         if not os.path.exists(self.conf_path):
             log.debug("Creating %s", self.conf_path)
@@ -73,7 +77,7 @@ class HarvestSupervisor():
 
     def _create_conf_file(self, harvest_id, routing_key):
         contents = """[program:{process_group}]
-command={python_executable} {script} seed {seed_filepath} --streaming --host {mq_host} --username {mq_username} --password {mq_password} --routing-key {routing_key}
+command={python_executable} {script} seed {seed_filepath} --streaming --host {mq_host} --username {mq_username} --password {mq_password} --routing-key {routing_key}{debug}
 user={user}
 autostart=true
 autorestart=true
@@ -89,7 +93,8 @@ stdout_logfile={log_path}/{safe_harvest_id}.out.log
            mq_password=self.mq_password,
            routing_key=routing_key,
            user=self.process_owner,
-           log_path=self.log_path)
+           log_path=self.log_path,
+           debug=" --debug" if self.debug else "")
 
         # Write the file
         conf_filepath = self._get_conf_filepath(harvest_id)
