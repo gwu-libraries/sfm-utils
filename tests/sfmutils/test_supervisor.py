@@ -23,7 +23,7 @@ class TestHarvestSupervisor(TestCase):
         conf_path = tempfile.mkdtemp()
         log_path = tempfile.mkdtemp()
 
-        #Setup mocks
+        # Setup mocks
         mock_server_proxy1 = MagicMock(spec=ServerProxy)
         mock_supervisor1 = MagicMock()
         mock_server_proxy1.supervisor = mock_supervisor1
@@ -37,25 +37,25 @@ class TestHarvestSupervisor(TestCase):
         mock_supervisor4 = MagicMock()
         mock_server_proxy4.supervisor = mock_supervisor4
 
-        #Return mock_twarc when instantiating a twarc.
+        # Return mock_twarc when instantiating a twarc.
         mock_server_proxy_class.side_effect = [mock_server_proxy1, mock_server_proxy2, mock_server_proxy3,
                                                mock_server_proxy4]
 
         supervisor = HarvestSupervisor("/opt/sfm/test_harvester.py", "test_host", "test_user", "test_password",
                                 conf_path=conf_path, log_path=log_path)
 
-        #Conf_path is empty
+        # Conf_path is empty
         self.assertFalse(os.listdir(conf_path))
 
-        #Start (which calls stop first)
+        # Start (which calls stop first)
         supervisor.start(message, "harvest.start.test.test_search")
 
-        #Seed file contains message.
+        # Seed file contains message.
         with open(os.path.join(conf_path, "test_1.json")) as f:
             seed = json.load(f)
         self.assertDictEqual(message, seed)
 
-        #Conf file as expected
+        # Conf file as expected
         with open(os.path.join(conf_path, "test_1.conf")) as f:
             conf = f.read()
         self.assertEqual("""[program:test_1]
@@ -67,23 +67,23 @@ stderr_logfile={log_path}/test_1.err.log
 stdout_logfile={log_path}/test_1.out.log
 """.format(conf_path=conf_path, log_path=log_path), conf)
 
-        #Remove process called
+        # Remove process called
         mock_supervisor1.stopProcess.assert_called_once_with("test_1", True)
         mock_supervisor1.removeProcessGroup.assert_called_once_with("test_1")
 
-        #Reload_config called
+        # Reload_config called
         mock_supervisor2.reloadConfig.assert_called_once_with()
 
-        #Add process group called
+        # Add process group called
         mock_supervisor3.addProcessGroup.assert_called_once_with("test_1")
 
-        #Now stop
+        # Now stop
         supervisor.stop("test:1")
-        #Remove process called
+        # Remove process called
         mock_supervisor4.stopProcess.assert_called_once_with("test_1", True)
         mock_supervisor4.removeProcessGroup.assert_called_once_with("test_1")
 
-        #Files deleted
+        # Files deleted
         self.assertFalse(os.path.exists(os.path.join(conf_path, "test_1.json")))
         self.assertFalse(os.path.exists(os.path.join(conf_path, "test_1.conf")))
 

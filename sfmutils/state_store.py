@@ -14,7 +14,7 @@ A harvest state store should implement the signature of DictHarvestStateStore.
 """
 
 
-class DictHarvestStateStore():
+class DictHarvestStateStore:
     """
     A harvest state store implementation backed by a dictionary and not persisted.
     """
@@ -50,11 +50,11 @@ class DictHarvestStateStore():
                 self._state[resource_type] = {}
             self._state[resource_type][key] = value
         else:
-            #Clearing value
+            # Clearing value
             if resource_type in self._state and key in self._state[resource_type]:
-                #Delete key
+                # Delete key
                 del self._state[resource_type][key]
-                #If resource type is empty then delete
+                # If resource type is empty then delete
                 if not self._state[resource_type]:
                     del self._state[resource_type]
 

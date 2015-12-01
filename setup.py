@@ -13,8 +13,9 @@ setup(
     scripts=['sfmutils/stream_consumer.py'],
     install_requires=['requests>=2.7.0',
                       # 'warcprox-gwu',
-                      'pika>=0.10.0',
-                      'supervisor>=3.1.3'],
+                      'kombu>=3.0.29',
+                      'supervisor>=3.1.3',
+                      'librabbitmq>=1.6.1'],
     tests_require=['mock>=1.3.0'],
     # dependency_links=['git+https://github.com/gwu-libraries/warcprox.git@master#egg=warcprox-gwu'],
     classifiers=[

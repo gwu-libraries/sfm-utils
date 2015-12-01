@@ -14,11 +14,11 @@ class TestStreamConsumer(TestCase):
         mock_supervisor_class = self.patcher.start()
         self.mock_supervisor = MagicMock(spec=HarvestSupervisor)
         mock_supervisor_class.side_effect = [self.mock_supervisor]
-        self.stream_consumer = StreamConsumer(MqConfig(None, None, None, None,
-                                                       {"test_queue": [
-                                                           "harvest.start.test.test_usertimeline",
-                                                           "harvest.start.test.test_search"]},
-                                                       skip_connection=True), "/opt/sfm/test.py")
+        self.stream_consumer = StreamConsumer("/opt/sfm/test.py",
+                                              mq_config=MqConfig(None, None, None, None,
+                                                                 {"test_queue": [
+                                                                     "harvest.start.test.test_usertimeline",
+                                                                     "harvest.start.test.test_search"]}), )
 
     def tearDown(self):
         self.patcher.stop()
@@ -38,7 +38,7 @@ class TestStreamConsumer(TestCase):
             }
         }
 
-        self.stream_consumer.message_body = json.dumps(message)
+        self.stream_consumer.message = message
         self.stream_consumer.routing_key = "harvest.start.test.test_usertimeline"
         self.stream_consumer.on_message()
 
@@ -49,7 +49,7 @@ class TestStreamConsumer(TestCase):
             "id": "test:1"
         }
 
-        self.stream_consumer.message_body = json.dumps(message)
+        self.stream_consumer.message = message
         self.stream_consumer.routing_key = "harvest.stop.test.test_usertimeline"
         self.stream_consumer.on_message()
 

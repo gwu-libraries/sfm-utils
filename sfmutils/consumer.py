@@ -1,12 +1,57 @@
-import pika
 import logging
+from kombu import Connection, Queue, Exchange, Producer
+from kombu.mixins import ConsumerMixin
 
 log = logging.getLogger(__name__)
 
 EXCHANGE = "sfm_exchange"
 
 
-class BaseConsumer():
+# Copied from https://github.com/celery/kombu/blob/master/kombu/mixins.py until in a kombu release.
+class ConsumerProducerMixin(ConsumerMixin):
+    """Version of ConsumerMixin having separate connection for also
+    publishing messages.
+    Example:
+    .. code-block:: python
+        class Worker(ConsumerProducerMixin):
+            def __init__(self, connection):
+                self.connection = connection
+            def get_consumers(self, Consumer, channel):
+                return [Consumer(queues=Queue('foo'),
+                                 on_message=self.handle_message,
+                                 accept='application/json',
+                                 prefetch_count=10)]
+            def handle_message(self, message):
+                self.producer.publish(
+                    {'message': 'hello to you'},
+                    exchange='',
+                    routing_key=message.properties['reply_to'],
+                    correlation_id=message.properties['correlation_id'],
+                    retry=True,
+                )
+    """
+    _producer_connection = None
+
+    def on_consume_end(self, connection, channel):
+        if self._producer_connection is not None:
+            self._producer_connection.close()
+            self._producer_connection = None
+
+    @property
+    def producer(self):
+        return Producer(self.producer_connection)
+
+    @property
+    def producer_connection(self):
+        if self._producer_connection is None:
+            conn = self.connection.clone()
+            conn.ensure_connection(self.on_connection_error,
+                                   self.connect_max_retries)
+            self._producer_connection = conn
+        return self._producer_connection
+
+
+class BaseConsumer(ConsumerProducerMixin):
     """
     Base class for consuming messages from Rabbit.
 
@@ -15,59 +60,62 @@ class BaseConsumer():
     be automatically created.
 
     Subclasses should override on_message().
+
+    To send a message, use self.producer.publish().
     """
-    def __init__(self, mq_config):
+    def __init__(self, mq_config=None):
         self.mq_config = mq_config
-        self._connection = None
+        if self.mq_config and self.mq_config.host and self.mq_config.username and self.mq_config.password:
+            self.connection = Connection(transport="librabbitmq",
+                                         hostname=mq_config.host,
+                                         userid=mq_config.username,
+                                         password=mq_config.password)
+            self.exchange = Exchange(name=self.mq_config.exchange,
+                                     type="topic",
+                                     durable=True)
+        else:
+            self.connection = None
+            self.exchange = None
 
-        #Creating a connection can be skipped for testing purposes
-        if not mq_config.skip_connection:
-            credentials = pika.PlainCredentials(mq_config.username, mq_config.password)
-            parameters = pika.ConnectionParameters(host=mq_config.host, credentials=credentials)
-            self._connection = pika.BlockingConnection(parameters)
-            channel = self._connection.channel()
-            #Declare sfm_exchange
-            channel.exchange_declare(exchange=mq_config.exchange,
-                                     type="topic", durable=True)
-            channel.close()
+        self.message = None
+        self.routing_key = None
 
-    def consume(self):
-        assert self._connection
+    def get_consumers(self, Consumer, channel):
+        assert self.mq_config
 
-        channel = self._connection.channel()
+        # Declaring ourselves rather than use auto-declare.
+        log.debug("Declaring %s exchange", self.mq_config.exchange)
+        self.exchange(channel).declare()
 
-        for queue, routing_keys in self.mq_config.queues.items():
-            #Declare harvester queue
-            channel.queue_declare(queue=queue,
-                                  durable=True)
-            #Bind
+        queues = []
+        for queue_name, routing_keys in self.mq_config.queues.items():
+            queue = Queue(name=queue_name,
+                          exchange=self.exchange,
+                          channel=channel,
+                          durable=True)
+            log.debug("Declaring queue %s", queue_name)
+            queue.declare()
             for routing_key in routing_keys:
-                channel.queue_bind(exchange=self.mq_config.exchange,
-                                   queue=queue, routing_key=routing_key)
+                log.debug("Binding queue %s to %s", queue_name, routing_key)
+                queue.bind_to(exchange=self.exchange,
+                              routing_key=routing_key)
+            queues.append(queue)
 
-        channel.basic_qos(prefetch_count=1)
-        channel.basic_qos(prefetch_count=1, all_channels=True)
-        for queue in self.mq_config.queues.keys():
-            log.info("Waiting for messages from %s", queue)
-            channel.basic_consume(self._callback, queue=queue)
+        consumer = Consumer(queues=queues,
+                            callbacks=[self._callback],
+                            auto_declare=False)
+        consumer.qos(prefetch_count=1, apply_global=True)
+        return [consumer]
 
-        channel.start_consuming()
-
-    def _callback(self, channel, method, _, body):
+    def _callback(self, message, message_obj):
         """
         Callback for receiving harvest message.
-
-        Note that channel and method can be None to allow invoking from a
-        non-mq environment.
         """
-        self.channel = channel
-        self.routing_key = method.routing_key
-        self.message_body = body
+        self.routing_key = message_obj.delivery_info["routing_key"]
+        self.message = message
 
-        #Acknowledge the message
-        if channel:
-            log.debug("Acking message")
-            channel.basic_ack(delivery_tag=method.delivery_tag)
+        # Acknowledge the message
+        message_obj.ack()
 
         self.on_message()
 
@@ -75,28 +123,26 @@ class BaseConsumer():
         """
         Override this class to consume message.
 
-        When called, self.channel, self.routing_key, and self.message_body
+        When called, self.routing_key and self.message
         will be populated based on the new message.
         """
         pass
 
 
-class MqConfig():
+class MqConfig:
     """
     Configuration for connecting to RabbitMQ.
     """
-    def __init__(self, host, username, password, exchange, queues, skip_connection=False):
+    def __init__(self, host, username, password, exchange, queues):
         """
         :param host: the host
         :param username: the username
         :param password: the password
         :param exchange: the exchange
         :param queues: map of queue names to lists of routing keys
-        :param skip_connection: if True, skip creating connection (for testing)
         """
         self.host = host
         self.username = username
         self.password = password
         self.exchange = exchange
         self.queues = queues
-        self.skip_connection = skip_connection

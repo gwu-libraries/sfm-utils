@@ -92,11 +92,11 @@ class warced():
         self.debug = debug
 
     def __enter__(self):
-        #Set environment variables that requests uses to configure proxy
+        # Set environment variables that requests uses to configure proxy
         self._set_envs()
 
         self.warcprox = SubProcess(self._generate_commandline())
-        #Wait for it to start up
+        # Wait for it to start up
         sleep(5)
 
         return self

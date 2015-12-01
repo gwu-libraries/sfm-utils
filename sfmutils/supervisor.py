@@ -12,7 +12,7 @@ from sfmutils.utils import safe_string
 log = logging.getLogger(__name__)
 
 
-class HarvestSupervisor():
+class HarvestSupervisor:
     def __init__(self, script, mq_host, mq_username, mq_password,
                  process_owner=None, python_executable="python", log_path="/var/log/sfm",
                  conf_path="/etc/supervisor/conf.d", internal_ip="127.0.0.1", socket_file="/var/run/supervisor.sock",
@@ -43,14 +43,14 @@ class HarvestSupervisor():
         log.info("Starting %s: %s", routing_key, harvest_start_message)
         harvest_id = harvest_start_message["id"]
 
-        #Stop existing
+        # Stop existing
         self.stop(harvest_id)
 
-        #Write seed file
+        # Write seed file
         with open(self._get_seed_filepath(harvest_id), 'w') as f:
             json.dump(harvest_start_message, f)
 
-        #Create conf file
+        # Create conf file
         self._create_conf_file(harvest_id, routing_key, )
 
         time.sleep(1)
@@ -60,16 +60,16 @@ class HarvestSupervisor():
     def stop(self, harvest_id):
         log.info("Stopping %s", harvest_id)
 
-        #Remove process group
+        # Remove process group
         self._remove_process_group(harvest_id)
 
-        #Delete conf file
+        # Delete conf file
         conf_filepath = self._get_conf_filepath(harvest_id)
         if os.path.exists(conf_filepath):
             log.debug("Deleting conf %s", conf_filepath)
             os.remove(conf_filepath)
 
-        #Delete seed file
+        # Delete seed file
         seed_filepath = self._get_seed_filepath(harvest_id)
         if os.path.exists(seed_filepath):
             log.debug("Deleting seed %s", seed_filepath)
@@ -77,7 +77,7 @@ class HarvestSupervisor():
 
     def _create_conf_file(self, harvest_id, routing_key):
         contents = """[program:{process_group}]
-command={python_executable} {script} seed {seed_filepath} --streaming --host {mq_host} --username {mq_username} --password {mq_password} --routing-key {routing_key}{debug}
+command={python_executable} {script}{debug} seed {seed_filepath} --streaming --host {mq_host} --username {mq_username} --password {mq_password} --routing-key {routing_key}
 user={user}
 autostart=true
 autorestart=true
