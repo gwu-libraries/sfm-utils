@@ -61,7 +61,7 @@ class warced():
     other configuration may be necessary for other HTTP libraries.
     """
     def __init__(self, prefix, directory, rollover_time=900, rollover_idle_time=930, record_size=1000*1000*100,
-                 compress=True, port=None):
+                 record_rollover_time=5*60, compress=True, port=None, debug=False):
         """
         :param prefix: prefix for the WARC filename.
         :param directory: directory into which to place the WARCS.
@@ -71,9 +71,12 @@ class warced():
         starting a new WARC. Suggest rollover_time + 30.
         :param record_size: Number of bytes before using record segmentation. Default
         is 100mb.
+        :param record_rollover_time: Number of seconds before using new record segment. Default
+        is 5 minutes.
         :param compress: gzip compress the WARC. Default is true.
         :param port: Port on which to run the proxy. If not provided, an open
         port will be selected.
+        :param debug: If True, runs warcprox with verbose option.
         """
         self.directory = directory
         self.prefix = prefix
@@ -81,17 +84,19 @@ class warced():
         self.rollover_time = rollover_time
         self.rollover_idle_time = rollover_idle_time
         self.record_size = record_size
+        self.record_rollover_time = record_rollover_time
         self.compress = compress
         self.warcprox = None
         self.ca_dir = tempfile.mkdtemp()
         self.ca_bundle = os.path.join(self.ca_dir, "warcprox-ca.pem")
+        self.debug = debug
 
     def __enter__(self):
-        #Set environment variables that requests uses to configure proxy
+        # Set environment variables that requests uses to configure proxy
         self._set_envs()
 
         self.warcprox = SubProcess(self._generate_commandline())
-        #Wait for it to start up
+        # Wait for it to start up
         sleep(5)
 
         return self
@@ -116,7 +121,7 @@ class warced():
         port = 8000
         while True:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            if s.connect_ex(('',port)):
+            if s.connect_ex(('', port)):
                 return port
             port += 1
 
@@ -134,6 +139,10 @@ class warced():
             cl += " --rollover-idle-time {}".format(self.rollover_idle_time)
         if self.record_size:
             cl += " -r {}".format(self.record_size)
+        if self.record_rollover_time:
+            cl += " --record-rollover-time {}".format(self.record_rollover_time)
+        if self.debug:
+            cl += " -v"
         return cl
 
     def __exit__(self, exc_type, exc_val, exc_tb):
