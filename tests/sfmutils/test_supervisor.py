@@ -3,6 +3,7 @@ import tempfile
 import shutil
 import os
 import json
+import getpass
 from unittest import TestCase
 from mock import patch, MagicMock
 from xmlrpclib import ServerProxy
@@ -42,7 +43,7 @@ class TestHarvestSupervisor(TestCase):
                                                mock_server_proxy4]
 
         supervisor = HarvestSupervisor("/opt/sfm/test_harvester.py", "test_host", "test_user", "test_password",
-                                conf_path=conf_path, log_path=log_path)
+                                       conf_path=conf_path, log_path=log_path)
 
         # Conf_path is empty
         self.assertFalse(os.listdir(conf_path))
@@ -60,12 +61,12 @@ class TestHarvestSupervisor(TestCase):
             conf = f.read()
         self.assertEqual("""[program:test_1]
 command=python /opt/sfm/test_harvester.py seed {conf_path}/test_1.json --streaming --host test_host --username test_user --password test_password --routing-key harvest.start.test.test_search
-user=justinlittman
+user={user}
 autostart=true
 autorestart=true
 stderr_logfile={log_path}/test_1.err.log
 stdout_logfile={log_path}/test_1.out.log
-""".format(conf_path=conf_path, log_path=log_path), conf)
+""".format(conf_path=conf_path, log_path=log_path, user=getpass.getuser()), conf)
 
         # Remove process called
         mock_supervisor1.stopProcess.assert_called_once_with("test_1", True)
