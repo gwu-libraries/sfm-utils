@@ -14,6 +14,8 @@ Most significantly:
     git clone https://github.com/gwu-libraries/sfm-utils.git
     cd sfm-utils
     pip install -r requirements.txt
+    # or
+    python setup.py build install
 
 ## Unit tests
 
