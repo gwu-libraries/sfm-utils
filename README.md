@@ -1,6 +1,8 @@
 # sfm-utils
 Utilities for Social Feed Manager.
 
+[![Build Status](https://travis-ci.org/gwu-libraries/sfm-utils.svg?branch=master)](https://travis-ci.org/gwu-libraries/sfm-utils)
+
 Most significantly:
 
 * BaseConsumer: Base class for consuming messages from Rabbit.
