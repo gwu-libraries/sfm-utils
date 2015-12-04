@@ -14,8 +14,16 @@ Most significantly:
     git clone https://github.com/gwu-libraries/sfm-utils.git
     cd sfm-utils
     pip install -r requirements.txt
-    # or
-    python setup.py build install
+
+Alternatively, it can be included as a dependency by adding the following to `requirements.txt`:
+
+    #Replace 0.1.0 with the version that you want.
+    git+https://github.com/gwu-libraries/sfm-utils.git@0.1.0#egg=sfmutils
+    #If using any of the consumers or harvesters
+    librabbitmq==1.6.1
+    #If using BaseHarvester    
+    git+https://github.com/gwu-libraries/warcprox.git@master#egg=warcprox-gwu
+
 
 ## Unit tests
 

@@ -12,7 +12,7 @@ setup(
     test_suite='tests',
     scripts=['sfmutils/stream_consumer.py'],
     install_requires=['requests>=2.7.0',
-                      # 'warcprox-gwu',
+                      'warcprox-gwu',
                       'kombu>=3.0.29',
                       'supervisor>=3.1.3',
                       'librabbitmq>=1.6.1'],
