@@ -15,7 +15,9 @@ setup(
                       'warcprox-gwu',
                       'kombu>=3.0.29',
                       'supervisor>=3.1.3',
-                      'librabbitmq>=1.6.1'],
+                      'librabbitmq>=1.6.1',
+                      'urllib3>=1.12',
+                      'warc>=0.2.1'],
     tests_require=['mock>=1.3.0'],
     # dependency_links=['git+https://github.com/gwu-libraries/warcprox.git@master#egg=warcprox-gwu'],
     classifiers=[
