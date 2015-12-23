@@ -77,7 +77,7 @@ class HarvestResult:
             msg_str += " {} messages are:".format(name)
 
         for (i, msg) in enumerate(messages, start=1):
-            msg_str += "({}) [{}] {}".format(i, msg["code"], msg["message"])
+            msg_str += "({}) [{}] {}".format(i, msg.code, msg.message)
 
         return msg_str
 
@@ -98,8 +98,12 @@ class HarvestResult:
     def increment_summary(self, key, increment=1):
         self.summary[key] += increment
 
+# Any exception thrown by the harvester.
 CODE_UNKNOWN_ERROR = "unknown_error"
-
+# Token not recognized by API.
+CODE_TOKEN_NOT_FOUND = "token_not_found"
+# UID not recognized by API.
+CODE_UID_NOT_FOUND = "uid_not_found"
 
 class Msg:
     """
