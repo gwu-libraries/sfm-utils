@@ -347,7 +347,7 @@ class BaseHarvester(BaseConsumer):
             "uids": harvest_result.uids
         }
         if harvest_result.ended:
-            message["date_ended"] = harvest_result.ended.isoformat(),
+            message["date_ended"] = harvest_result.ended.isoformat()
 
         # Routing key may be none
         status_routing_key = harvest_routing_key.replace("start", "status")
