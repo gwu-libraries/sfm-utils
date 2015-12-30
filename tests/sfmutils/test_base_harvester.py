@@ -216,6 +216,8 @@ class TestBaseHarvester(tests.TestCase):
         self.assertDictEqual({
             "library_of_congress": "671366249@N03"
         }, harvest_result_message["uids"])
+        self.assertEqual(1, harvest_result_message["warcs"]["count"])
+        self.assertEqual(9, harvest_result_message["warcs"]["bytes"])
 
     # Mock out tempfile so that have control over location of warc directory.
     @patch("sfmutils.harvester.tempfile", autospec=True)
@@ -276,6 +278,8 @@ class TestBaseHarvester(tests.TestCase):
             "code": "unknown_error",
             "message": "Darn!"
         }, harvest_result_message["errors"][0])
+        self.assertEqual(0, harvest_result_message["warcs"]["count"])
+        self.assertEqual(0, harvest_result_message["warcs"]["bytes"])
 
     # Mock out tempfile so that have control over location of warc directory.
     @patch("sfmutils.harvester.tempfile", autospec=True)
@@ -358,6 +362,8 @@ class TestBaseHarvester(tests.TestCase):
         self.assertListEqual([os.path.join(test_collection_path,
                               "2015/11/09/19/test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000.warc.gz")],
                              harvester.harvest_result.warcs)
+        self.assertEqual(1, len(harvester.harvest_result.warcs))
+        self.assertEqual(9, harvester.harvest_result.warc_bytes)
 
         # Delete message file
         os.remove(message_filepath)
@@ -511,6 +517,8 @@ class TestBaseHarvester(tests.TestCase):
         self.assertDictEqual({
             "library_of_congress": "671366249@N03"
         }, harvest_running_message["uids"])
+        self.assertTrue(isinstance(harvest_running_message["warcs"]["count"], int))
+        self.assertTrue(isinstance(harvest_running_message["warcs"]["bytes"], int))
 
         # Web harvest
         name4, _, kwargs4 = mock_producer4.mock_calls[0]
@@ -543,6 +551,8 @@ class TestBaseHarvester(tests.TestCase):
         self.assertTrue(stuff_count < harvest_completed_message["summary"]["stuff"])
         self.assertFalse(len(harvest_completed_message["token_updates"]))
         self.assertFalse(len(harvest_completed_message["uids"]))
+        self.assertEqual(2, harvest_completed_message["warcs"]["count"])
+        self.assertEqual(18, harvest_completed_message["warcs"]["bytes"])
 
         # Delete message file
         os.remove(message_filepath)
