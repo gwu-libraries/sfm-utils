@@ -389,8 +389,10 @@ class BaseHarvester(BaseConsumer):
 
         # Arguments
         parser = argparse.ArgumentParser()
-        parser.add_argument("--debug", action="store_true")
-        parser.add_argument("--debug-http", action="store_true")
+        parser.add_argument("--debug", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
+                            default="False", const="True")
+        parser.add_argument("--debug-http", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
+                            default="False", const="True")
 
         subparsers = parser.add_subparsers(dest="command")
 

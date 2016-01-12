@@ -60,7 +60,8 @@ if __name__ == "__main__":
     parser.add_argument("queue")
     parser.add_argument("routing_keys", help="Comma separated list of routing keys")
     parser.add_argument("script")
-    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--debug", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
+                        default="False", const="True")
 
     args = parser.parse_args()
 
