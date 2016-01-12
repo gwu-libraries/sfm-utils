@@ -9,7 +9,7 @@ from unittest import TestCase
 class TestJsonHarvestStateStore(TestCase):
 
     def setUp(self):
-        self.collection_path = tempfile.mkdtemp()
+        self.collection_path = os.path.join(tempfile.mkdtemp(), "test")
         self.store = JsonHarvestStateStore(self.collection_path)
 
     def tearDown(self):

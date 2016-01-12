@@ -84,6 +84,8 @@ class JsonHarvestStateStore(DictHarvestStateStore):
     def set_state(self, resource_type, key, value):
         self._load_state()
         DictHarvestStateStore.set_state(self, resource_type, key, value)
+        if not os.path.exists(self.collection_path):
+            os.makedirs(self.collection_path)
         with codecs.open(self.state_filepath, 'w') as state_file:
             json.dump(self._state, state_file)
 
