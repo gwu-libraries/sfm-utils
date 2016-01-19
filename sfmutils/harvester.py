@@ -40,6 +40,7 @@ class HarvestResult:
         self.errors = []
         self.urls = []
         self.warcs = []
+        self.warc_bytes = 0
         self.summary = Counter()
         # Map of uids to tokens for which tokens have been found to have changed.
         self.token_updates = {}
@@ -60,6 +61,8 @@ class HarvestResult:
         harv_str += self._str_messages(self.errors, "Error")
         if self.warcs:
             harv_str += " Warcs: {}".format(self.warcs)
+        if self.warc_bytes:
+            harv_str += " Warc bytes: {}".format(self.warc_bytes)
         if self.urls:
             harv_str += " Urls: {}".format(self.urls)
         if self.summary:
@@ -89,6 +92,7 @@ class HarvestResult:
         self.warnings.extend(other.warnings)
         self.errors.extend(other.errors)
         self.warcs.extend(other.warcs)
+        self.warc_bytes += other.warc_bytes
         self.urls.extend(other.urls)
         self.summary.update(other.summary)
 
@@ -98,12 +102,17 @@ class HarvestResult:
     def increment_summary(self, key, increment=1):
         self.summary[key] += increment
 
+    def add_warc(self, filepath):
+        self.warcs.append(filepath)
+        self.warc_bytes += os.path.getsize(filepath)
+
 # Any exception thrown by the harvester.
 CODE_UNKNOWN_ERROR = "unknown_error"
 # Token not recognized by API.
 CODE_TOKEN_NOT_FOUND = "token_not_found"
 # UID not recognized by API.
 CODE_UID_NOT_FOUND = "uid_not_found"
+
 
 class Msg:
     """
@@ -218,7 +227,7 @@ class BaseHarvester(BaseConsumer):
                     dest_warc_filepath = self._move_file(warc_filename,
                                                          self.warc_temp_dir,
                                                          self._path_for_warc(collection_path, warc_filename))
-                    self.harvest_result.warcs.append(dest_warc_filepath)
+                    self.harvest_result.add_warc(dest_warc_filepath)
                     # Send warc created message
                     self._send_warc_created_message(collection_id, collection_path,
                                                     self._warc_id(warc_filename), dest_warc_filepath)
@@ -344,8 +353,13 @@ class BaseHarvester(BaseConsumer):
             "date_started": harvest_result.started.isoformat(),
             "summary": dict(harvest_result.summary),
             "token_updates": harvest_result.token_updates,
-            "uids": harvest_result.uids
+            "uids": harvest_result.uids,
+            "warcs": {
+                "count": len(harvest_result.warcs),
+                "bytes": harvest_result.warc_bytes
+            }
         }
+
         if harvest_result.ended:
             message["date_ended"] = harvest_result.ended.isoformat()
 
