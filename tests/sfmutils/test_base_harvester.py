@@ -9,6 +9,7 @@ from time import sleep
 from kombu import Producer, Connection, Exchange
 from kombu.message import Message
 import tests
+import iso8601
 from sfmutils.harvester import BaseHarvester
 from sfmutils.state_store import NullHarvestStateStore
 from sfmutils.harvester import Msg
@@ -180,7 +181,7 @@ class TestBaseHarvester(tests.TestCase):
         self.assertEqual(warc_created_message["warc"]["sha1"], "3d63d3c46d5dfac8495621c9c697e2089e5359b2")
         self.assertEqual(warc_created_message["warc"]["bytes"], 9)
         self.assertEqual(warc_created_message["warc"]["id"], "test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000")
-        self.assertIsNotNone(warc_created_message["warc"]["date_created"])
+        self.assertIsNotNone(iso8601.parse_date(warc_created_message["warc"]["date_created"]))
 
         # Harvest result message
         name3, _, kwargs3 = mock_producer3.mock_calls[0]
@@ -204,8 +205,8 @@ class TestBaseHarvester(tests.TestCase):
             "code": "FAKE_CODE3",
             "message": "This is my error."
         }, harvest_result_message["errors"][0])
-        self.assertIsNotNone(harvest_result_message["date_started"])
-        self.assertIsNotNone(harvest_result_message["date_ended"])
+        self.assertIsNotNone(iso8601.parse_date(harvest_result_message["date_started"]))
+        self.assertIsNotNone(iso8601.parse_date(harvest_result_message["date_ended"]))
         self.assertDictEqual({
             "photo": 12,
             "user": 1
@@ -477,7 +478,7 @@ class TestBaseHarvester(tests.TestCase):
         self.assertEqual(warc_created_message["warc"]["sha1"], "3d63d3c46d5dfac8495621c9c697e2089e5359b2")
         self.assertEqual(warc_created_message["warc"]["bytes"], 9)
         self.assertEqual(warc_created_message["warc"]["id"], "test_1-20151109195229879-00004-97528-GLSS-F0G5RP-8000")
-        self.assertIsNotNone(warc_created_message["warc"]["date_created"])
+        self.assertIsNotNone(iso8601.parse_date(warc_created_message["warc"]["date_created"]))
 
         # Harvest status message
         name3, _, kwargs3 = mock_producer3.mock_calls[0]
@@ -501,7 +502,7 @@ class TestBaseHarvester(tests.TestCase):
             "code": "FAKE_CODE3",
             "message": "This is my error."
         }, harvest_running_message["errors"][0])
-        self.assertIsNotNone(harvest_running_message["date_started"])
+        self.assertIsNotNone(iso8601.parse_date(harvest_running_message["date_started"]))
         self.assertIsNone(harvest_running_message.get("date_ended"))
         stuff_count = harvest_running_message["summary"]["stuff"]
         self.assertTrue(stuff_count)
@@ -538,8 +539,8 @@ class TestBaseHarvester(tests.TestCase):
         self.assertFalse(len(harvest_completed_message["infos"]))
         self.assertFalse(len(harvest_completed_message["warnings"]))
         self.assertFalse(len(harvest_completed_message["errors"]))
-        self.assertIsNotNone(harvest_completed_message["date_started"])
-        self.assertIsNotNone(harvest_completed_message.get("date_ended"))
+        self.assertIsNotNone(iso8601.parse_date(harvest_completed_message["date_started"]))
+        self.assertIsNotNone(iso8601.parse_date(harvest_completed_message.get("date_ended")))
         self.assertTrue(stuff_count < harvest_completed_message["summary"]["stuff"])
         self.assertFalse(len(harvest_completed_message["token_updates"]))
         self.assertFalse(len(harvest_completed_message["uids"]))

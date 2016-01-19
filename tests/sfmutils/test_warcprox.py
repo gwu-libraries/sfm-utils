@@ -46,9 +46,6 @@ class WarcedTest(TestCase):
         warc_dir = tempfile.mkdtemp()
         try:
             with warced("test", warc_dir) as w:
-                print w._generate_commandline()
-                print os.environ["HTTPS_PROXY"]
-                print os.environ["REQUESTS_CA_BUNDLE"]
                 resp = requests.get("https://www.gwu.edu")
                 self.assertEqual(200, resp.status_code)
             files = os.listdir(warc_dir)
