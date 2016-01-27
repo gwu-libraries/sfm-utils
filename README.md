@@ -13,7 +13,12 @@ Most significantly:
 ## Installing
     git clone https://github.com/gwu-libraries/sfm-utils.git
     cd sfm-utils
-    pip install -r requirements.txt
+    pip install -r requirements/requirements.txt
+    
+Note that `requirements/requirements.txt` references the latest releast of warcprox-gwu.
+If you are doing development on the interaction between warcprox-gwu and
+sfm-utils, using `requirements/dev.txt`. This uses a local copy (`../warcprox`)
+of warcprox-gwu in editable mode.
 
 Alternatively, it can be included as a dependency by adding the following to `requirements.txt`:
 
