@@ -10,7 +10,7 @@ import sys
 import threading
 import signal
 from collections import Counter
-
+import uuid
 import os
 import re
 import codecs
@@ -18,26 +18,18 @@ from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
 from sfmutils.state_store import JsonHarvestStateStore
 from sfmutils.warcprox import warced
 from sfmutils.utils import safe_string
+from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING
 
 
 log = logging.getLogger(__name__)
 
-STATUS_SUCCESS = "completed success"
-STATUS_FAILURE = "completed failure"
-STATUS_RUNNING = "running"
 
-
-class HarvestResult:
+class HarvestResult(BaseResult):
     """
     Keeps track of the results of a harvest.
     """
     def __init__(self):
-        self.success = True
-        self.started = None
-        self.ended = None
-        self.infos = []
-        self.warnings = []
-        self.errors = []
+        BaseResult.__init__(self)
         self.urls = []
         self.warcs = []
         self.warc_bytes = 0
@@ -47,18 +39,11 @@ class HarvestResult:
         # Map of tokens to uids for tokens for which uids have been found.
         self.uids = {}
 
-    def __nonzero__(self):
-        return 1 if self.success else 0
+    def _result_name(self):
+        return "Harvest"
 
-    def __str__(self):
-        harv_str = "Harvest response is {}.".format(self.success)
-        if self.started:
-            harv_str += " Started: {}".format(self.started)
-        if self.ended:
-            harv_str += " Ended: {}".format(self.ended)
-        harv_str += self._str_messages(self.infos, "Informational")
-        harv_str += self._str_messages(self.warnings, "Warning")
-        harv_str += self._str_messages(self.errors, "Error")
+    def _addl_str(self):
+        harv_str = ""
         if self.warcs:
             harv_str += " Warcs: {}".format(self.warcs)
         if self.warc_bytes:
@@ -72,29 +57,6 @@ class HarvestResult:
         if self.uids:
             harv_str += " Uids: {}".format(self.uids)
         return harv_str
-
-    @staticmethod
-    def _str_messages(messages, name):
-        msg_str = ""
-        if messages:
-            msg_str += " {} messages are:".format(name)
-
-        for (i, msg) in enumerate(messages, start=1):
-            msg_str += "({}) [{}] {}".format(i, msg.code, msg.message)
-
-        return msg_str
-
-    def merge(self, other):
-        self.success = self.success and other.success
-        self.started = self.started or other.started
-        self.ended = self.ended or other.ended
-        self.infos.extend(other.infos)
-        self.warnings.extend(other.warnings)
-        self.errors.extend(other.errors)
-        self.warcs.extend(other.warcs)
-        self.warc_bytes += other.warc_bytes
-        self.urls.extend(other.urls)
-        self.summary.update(other.summary)
 
     def urls_as_set(self):
         return set(self.urls)
@@ -112,26 +74,6 @@ CODE_UNKNOWN_ERROR = "unknown_error"
 CODE_TOKEN_NOT_FOUND = "token_not_found"
 # UID not recognized by API.
 CODE_UID_NOT_FOUND = "uid_not_found"
-
-
-class Msg:
-    """
-    An informational, warning, or error message to be included in the harvest
-    status.
-
-    Where possible, code should be selected from harvester.CODE_*.
-    """
-    def __init__(self, code, message):
-        assert code
-        assert message
-        self.code = code
-        self.message = message
-
-    def to_map(self):
-        return {
-            "code": self.code,
-            "message": self.message
-        }
 
 
 class BaseHarvester(BaseConsumer):
@@ -229,8 +171,8 @@ class BaseHarvester(BaseConsumer):
                                                          self._path_for_warc(collection_path, warc_filename))
                     self.harvest_result.add_warc(dest_warc_filepath)
                     # Send warc created message
-                    self._send_warc_created_message(collection_id, collection_path,
-                                                    self._warc_id(warc_filename), dest_warc_filepath)
+                    self._send_warc_created_message(harvest_id, collection_id, collection_path,
+                                                    uuid.uuid4().hex, dest_warc_filepath)
 
             # TODO: Persist summary so that can resume
 
@@ -298,10 +240,6 @@ class BaseHarvester(BaseConsumer):
         return "/".join([collection_path, m.group(1), m.group(2), m.group(3), m.group(4)])
 
     @staticmethod
-    def _warc_id(warc_filename):
-        return warc_filename.replace(".warc", "").replace(".gz", "")
-
-    @staticmethod
     def _move_file(filename, src_path, dest_path):
         src_filepath = os.path.join(src_path, filename)
         dest_filepath = os.path.join(dest_path, filename)
@@ -310,19 +248,6 @@ class BaseHarvester(BaseConsumer):
             os.makedirs(dest_path)
         shutil.move(src_filepath, dest_filepath)
         return dest_filepath
-
-    def _publish_message(self, routing_key, message):
-        message_body = json.dumps(message, indent=4)
-        if self.mq_config:
-            log.debug("Sending message to %s with routing_key %s. The body is: %s", self.exchange.name, routing_key,
-                      json.dumps(message, indent=4))
-            self.producer.publish(body=message,
-                                  routing_key=routing_key,
-                                  retry=True,
-                                  exchange=self.exchange)
-        else:
-            log.debug("Skipping sending message to sfm_exchange with routing_key %s. The body is: %s",
-                      routing_key, message_body)
 
     def _send_web_harvest_message(self, harvest_id, collection_id, collection_path, urls):
         message = {
@@ -367,8 +292,11 @@ class BaseHarvester(BaseConsumer):
         status_routing_key = harvest_routing_key.replace("start", "status")
         self._publish_message(status_routing_key, message)
 
-    def _send_warc_created_message(self, collection_id, collection_path, warc_id, warc_path):
+    def _send_warc_created_message(self, harvest_id, collection_id, collection_path, warc_id, warc_path):
         message = {
+            "harvest": {
+                "id": harvest_id
+            },
             "collection": {
                 "id": collection_id,
                 "path": collection_path

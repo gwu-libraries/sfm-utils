@@ -1,0 +1,59 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Connection: [keep-alive]
+      User-Agent: [python-requests/2.9.1]
+    method: GET
+    uri: http://192.168.99.100:8081/api/v1/warcs/?harvest_date_end=2015-02-22T14%3A49%3A07Z
+  response:
+    body: {string: !!python/unicode '[]'}
+    headers:
+      allow: ['GET, HEAD, OPTIONS']
+      content-type: [application/json]
+      date: ['Thu, 25 Feb 2016 23:53:39 GMT']
+      server: [WSGIServer/0.1 Python/2.7.6]
+      vary: ['Accept, Cookie']
+      x-frame-options: [SAMEORIGIN]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Connection: [keep-alive]
+      User-Agent: [python-requests/2.9.1]
+    method: GET
+    uri: http://192.168.99.100:8081/api/v1/warcs/?harvest_date_end=2016-02-22T14%3A49%3A07Z
+  response:
+    body: {string: !!python/unicode '[{"warc_id":"d3f524b52de0495b9abbf3b36b1fb06f","path":"/sfm-data/collection/1/2016/02/22/14/612bc180ec8346c4bbc5aa2c52dcc952-20160222143621927-00000-37-551fcc0ef48b-8000.warc.gz","sha1":"28076c245bc23d5e18e8531c19700dec869e2f9a","bytes":58048,"date_created":"2016-02-22T14:37:26Z"},{"warc_id":"9dc0b9c3a93a49eb8f713330b43f954c","path":"/sfm-data/collection/1/2016/02/22/14/d8ecf0efa0fa49819f907930bb766f69-20160222143902368-00000-70-551fcc0ef48b-8000.warc.gz","sha1":"000ffb3371eadb507d77d181ca3f0c5d3c74a2fc","bytes":460518,"date_created":"2016-02-22T14:49:07Z"}]'}
+    headers:
+      allow: ['GET, HEAD, OPTIONS']
+      content-type: [application/json]
+      date: ['Thu, 25 Feb 2016 23:53:39 GMT']
+      server: [WSGIServer/0.1 Python/2.7.6]
+      vary: ['Accept, Cookie']
+      x-frame-options: [SAMEORIGIN]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Connection: [keep-alive]
+      User-Agent: [python-requests/2.9.1]
+    method: GET
+    uri: http://192.168.99.100:8081/api/v1/warcs/?harvest_date_end=2017-02-22T14%3A48%3A07Z
+  response:
+    body: {string: !!python/unicode '[{"warc_id":"d3f524b52de0495b9abbf3b36b1fb06f","path":"/sfm-data/collection/1/2016/02/22/14/612bc180ec8346c4bbc5aa2c52dcc952-20160222143621927-00000-37-551fcc0ef48b-8000.warc.gz","sha1":"28076c245bc23d5e18e8531c19700dec869e2f9a","bytes":58048,"date_created":"2016-02-22T14:37:26Z"},{"warc_id":"9dc0b9c3a93a49eb8f713330b43f954c","path":"/sfm-data/collection/1/2016/02/22/14/d8ecf0efa0fa49819f907930bb766f69-20160222143902368-00000-70-551fcc0ef48b-8000.warc.gz","sha1":"000ffb3371eadb507d77d181ca3f0c5d3c74a2fc","bytes":460518,"date_created":"2016-02-22T14:49:07Z"},{"warc_id":"89242dcab7ba401eb500caeebc227bfd","path":"/sfm-data/collection/1/2016/02/22/15/c4ec6bc7112f4696b1f9372100ab93bb-20160222154659265-00000-286-551fcc0ef48b-8000.warc.gz","sha1":"bbd9316245f4494cb6f2fa8ec2f8c91e10cff1a3","bytes":142164,"date_created":"2016-02-22T15:50:08Z"}]'}
+    headers:
+      allow: ['GET, HEAD, OPTIONS']
+      content-type: [application/json]
+      date: ['Thu, 25 Feb 2016 23:53:39 GMT']
+      server: [WSGIServer/0.1 Python/2.7.6]
+      vary: ['Accept, Cookie']
+      x-frame-options: [SAMEORIGIN]
+    status: {code: 200, message: OK}
+version: 1
