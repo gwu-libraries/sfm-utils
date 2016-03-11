@@ -33,7 +33,17 @@ class BaseWarcIter:
                 # An iterator over json objects which constitute the payload of a record.
                 if not self.line_oriented:
                     # A non-line-oriented payload only has one payload part.
-                    payload_parts_iter = [record.http_response.data]
+                    """
+                    Adding analysis of chunk encoding
+                    """
+                    payload_data = ""
+                    encoding_type = record.http_response.getheader('transfer-encoding')
+                    if encoding_type and encoding_type.lower() == "chunked":
+                        for line in record.http_response.read_chunked(decode_content=True):
+                                payload_data += line
+                    else:
+                        payload_data = record.http_response.data
+                    payload_parts_iter = [payload_data]
                 else:
                     # A line-oriented payload has many payload parts.
                     payload_parts_iter = self._iter_lines(record.http_response)
