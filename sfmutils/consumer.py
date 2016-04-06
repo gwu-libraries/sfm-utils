@@ -1,6 +1,7 @@
 import logging
 from kombu import Connection, Queue, Exchange, Producer
 from kombu.mixins import ConsumerMixin
+import json
 
 log = logging.getLogger(__name__)
 
@@ -127,6 +128,19 @@ class BaseConsumer(ConsumerProducerMixin):
         will be populated based on the new message.
         """
         pass
+
+    def _publish_message(self, routing_key, message):
+        message_body = json.dumps(message, indent=4)
+        if self.mq_config:
+            log.debug("Sending message to %s with routing_key %s. The body is: %s", self.exchange.name, routing_key,
+                      json.dumps(message, indent=4))
+            self.producer.publish(body=message,
+                                  routing_key=routing_key,
+                                  retry=True,
+                                  exchange=self.exchange)
+        else:
+            log.debug("Skipping sending message to sfm_exchange with routing_key %s. The body is: %s",
+                      routing_key, message_body)
 
 
 class MqConfig:
