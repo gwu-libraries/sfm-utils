@@ -94,7 +94,7 @@ stdout_logfile={log_path}/{safe_harvest_id}.out.log
            routing_key=routing_key,
            user=self.process_owner,
            log_path=self.log_path,
-           debug=" --debug" if self.debug else "")
+           debug=" --debug=True" if self.debug else "")
 
         # Write the file
         conf_filepath = self._get_conf_filepath(harvest_id)

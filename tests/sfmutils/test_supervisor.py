@@ -43,7 +43,7 @@ class TestHarvestSupervisor(TestCase):
                                                mock_server_proxy4]
 
         supervisor = HarvestSupervisor("/opt/sfm/test_harvester.py", "test_host", "test_user", "test_password",
-                                       conf_path=conf_path, log_path=log_path)
+                                       conf_path=conf_path, log_path=log_path, debug=True)
 
         # Conf_path is empty
         self.assertFalse(os.listdir(conf_path))
@@ -60,7 +60,7 @@ class TestHarvestSupervisor(TestCase):
         with open(os.path.join(conf_path, "test_1.conf")) as f:
             conf = f.read()
         self.assertEqual("""[program:test_1]
-command=python /opt/sfm/test_harvester.py seed {conf_path}/test_1.json --streaming --host test_host --username test_user --password test_password --routing-key harvest.start.test.test_search
+command=python /opt/sfm/test_harvester.py --debug=True seed {conf_path}/test_1.json --streaming --host test_host --username test_user --password test_password --routing-key harvest.start.test.test_search
 user={user}
 autostart=true
 autorestart=true
