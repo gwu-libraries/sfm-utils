@@ -173,6 +173,7 @@ class TestBaseHarvester(tests.TestCase):
         self.assertEqual("publish", name2)
         self.assertEqual("warc_created", kwargs2["routing_key"])
         warc_created_message = kwargs2["body"]
+        self.assertEqual(warc_created_message["harvest"]["id"], "test:1")
         self.assertEqual(warc_created_message["collection"]["id"], "test_collection")
         self.assertEqual(warc_created_message["collection"]["path"], test_collection_path)
         self.assertEqual(warc_created_message["warc"]["path"],
@@ -180,7 +181,7 @@ class TestBaseHarvester(tests.TestCase):
                                       "2015/11/09/19/test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000.warc.gz"))
         self.assertEqual(warc_created_message["warc"]["sha1"], "3d63d3c46d5dfac8495621c9c697e2089e5359b2")
         self.assertEqual(warc_created_message["warc"]["bytes"], 9)
-        self.assertEqual(warc_created_message["warc"]["id"], "test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000")
+        self.assertEqual(32, len(warc_created_message["warc"]["id"]))
         self.assertIsNotNone(iso8601.parse_date(warc_created_message["warc"]["date_created"]))
 
         # Harvest result message
@@ -483,7 +484,7 @@ class TestBaseHarvester(tests.TestCase):
                                       "2015/11/09/19/test_1-20151109195229879-00004-97528-GLSS-F0G5RP-8000.warc.gz"))
         self.assertEqual(warc_created_message["warc"]["sha1"], "3d63d3c46d5dfac8495621c9c697e2089e5359b2")
         self.assertEqual(warc_created_message["warc"]["bytes"], 9)
-        self.assertEqual(warc_created_message["warc"]["id"], "test_1-20151109195229879-00004-97528-GLSS-F0G5RP-8000")
+        self.assertEqual(32, len(warc_created_message["warc"]["id"]))
         self.assertIsNotNone(iso8601.parse_date(warc_created_message["warc"]["date_created"]))
 
         # Harvest status message
@@ -537,7 +538,7 @@ class TestBaseHarvester(tests.TestCase):
         self.assertEqual(warc_created_message2["warc"]["path"],
                          os.path.join(test_collection_path,
                                       "2015/11/09/19/test_1-20151109195229879-00008-97528-GLSS-F0G5RP-8000.warc.gz"))
-        self.assertEqual(warc_created_message2["warc"]["id"], "test_1-20151109195229879-00008-97528-GLSS-F0G5RP-8000")
+        self.assertEqual(32, len(warc_created_message2["warc"]["id"]))
 
         # Harvest completed message
         name6, _, kwargs6 = mock_producer6.mock_calls[0]
