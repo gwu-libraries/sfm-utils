@@ -14,6 +14,7 @@ import uuid
 import os
 import re
 import codecs
+import uuid
 from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
 from sfmutils.state_store import JsonHarvestStateStore
 from sfmutils.warcprox import warced
@@ -251,9 +252,7 @@ class BaseHarvester(BaseConsumer):
 
     def _send_web_harvest_message(self, harvest_id, collection_id, collection_path, urls):
         message = {
-            # TODO: Make this unique when multiple web harvest messages are sent.
-            # This will be unique
-            "id": "{}:{}".format(self.__class__.__name__, harvest_id),
+            "id": uuid.uuid4().hex,
             "parent_id": harvest_id,
             "type": "web",
             "seeds": [],

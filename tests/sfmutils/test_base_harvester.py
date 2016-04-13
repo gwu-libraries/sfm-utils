@@ -147,26 +147,24 @@ class TestBaseHarvester(tests.TestCase):
         shutil.rmtree(test_collection_path)
 
         # Web harvest
-        web_harvest_message = {
-            "id": "TestableHarvester:test:1",
-            "parent_id": "test:1",
-            "type": "web",
-            "seeds": [
-                {
-                    "token": "http://www.gwu.edu"
-                },
-                {
-                    "token": "http://library.gwu.edu"
-                }
-            ],
-            "collection": {
-                "id": "test_collection",
-                "path": test_collection_path
+        name1, _, kwargs1 = mock_producer1.mock_calls[0]
+        self.assertEqual("publish", name1)
+        self.assertEqual("harvest.start.web", kwargs1["routing_key"])
+        web_harvest_message = kwargs1["body"]
+        # A 32 character UUID
+        self.assertEqual(32, len(web_harvest_message["id"]))
+        self.assertEqual("test:1", web_harvest_message["parent_id"])
+        self.assertEqual("web", web_harvest_message["type"])
+        self.assertEqual([
+            {
+                "token": "http://www.gwu.edu"
+            },
+            {
+                "token": "http://library.gwu.edu"
             }
-        }
-        mock_producer1.publish.assert_called_once_with(body=web_harvest_message,
-                                                       retry=True, routing_key="harvest.start.web",
-                                                       exchange=mock_exchange)
+        ], web_harvest_message["seeds"])
+        self.assertEqual("test_collection", web_harvest_message["collection"]["id"])
+        self.assertEqual(test_collection_path, web_harvest_message["collection"]["path"])
 
         # Warc created message
         name2, _, kwargs2 = mock_producer2.mock_calls[0]
@@ -463,7 +461,9 @@ class TestBaseHarvester(tests.TestCase):
         self.assertEqual("publish", name1)
         self.assertEqual("harvest.start.web", kwargs1["routing_key"])
         web_harvest_message1 = kwargs1["body"]
-        self.assertEqual("TestableStreamHarvester:test:1", web_harvest_message1["id"])
+        # This should be a 32 character uuid.
+        web_harvest_id1 = web_harvest_message1["id"]
+        self.assertEqual(32, len(web_harvest_id1))
         self.assertEqual("test:1", web_harvest_message1["parent_id"])
         self.assertEqual("web", web_harvest_message1["type"])
         self.assertEqual("test_collection", web_harvest_message1["collection"]["id"])
@@ -526,7 +526,7 @@ class TestBaseHarvester(tests.TestCase):
         name4, _, kwargs4 = mock_producer4.mock_calls[0]
         self.assertEqual("harvest.start.web", kwargs4["routing_key"])
         web_harvest_message2 = kwargs4["body"]
-        self.assertEqual("TestableStreamHarvester:test:1", web_harvest_message2["id"])
+        self.assertNotEqual(web_harvest_id1, web_harvest_message2["id"])
         # Contains some token
         self.assertTrue(len(web_harvest_message2["seeds"]))
         self.assertTrue(web_harvest_message2["seeds"][0]["token"].startswith("http://www."))
