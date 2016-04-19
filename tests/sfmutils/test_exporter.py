@@ -85,7 +85,9 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(seedset_id="005b131f5f854402afa2b08a4b7ba960", seed_ids = [], harvest_date_start=harvest_date_start, harvest_date_end=harvest_date_end)
+        mock_api_client.warcs.assert_called_once_with(seedset_id="005b131f5f854402afa2b08a4b7ba960", seed_ids=[],
+                                                      harvest_date_start=harvest_date_start,
+                                                      harvest_date_end=harvest_date_end)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, True, item_datetime_start, item_datetime_end, [])
 
         self.assertTrue(exporter.export_result.success)
@@ -107,7 +109,66 @@ class TestExporter(tests.TestCase):
     @patch("sfmutils.exporter.ApiClient", autospec=True)
     # Mock out Producer
     @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_export_seeds(self, mock_producer_cls, mock_api_client_cls):
+    def test_export_dehydrate(self, mock_producer_cls, mock_api_client_cls):
+        mock_warc_iter_cls = MagicMock()
+        mock_table_cls = MagicMock()
+        mock_table = MagicMock(spec=BaseTable)
+        mock_table_cls.side_effect = [mock_table]
+        mock_table.__iter__ = Mock(return_value=iter([("key1", "key2"), ("k1v1", "k2v1"), ("k1v2", "k2v2")]))
+        mock_table.id_field.return_value = "key2"
+
+        mock_api_client = MagicMock(spec=ApiClient)
+        mock_api_client_cls.side_effect = [mock_api_client]
+        mock_api_client.warcs.side_effect = [self.warcs]
+
+        mock_connection = MagicMock(spec=Connection)
+        mock_exchange = MagicMock(spec=Exchange)
+        mock_exchange.name = "test exchange"
+        mock_producer = MagicMock(spec=Producer)
+        mock_producer_cls.side_effect = [mock_producer]
+
+        export_message = {
+            "id": "test1",
+            "type": "test_user",
+            "seedset": {
+                "id": "005b131f5f854402afa2b08a4b7ba960"
+            },
+            "format": "dehydrate",
+            "path": self.export_path,
+
+        }
+
+        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, warc_base_path=self.warc_base_path)
+        exporter.mq_config = True
+        exporter._producer_connection = mock_connection
+        exporter.exchange = mock_exchange
+
+        exporter.routing_key = "export.start.test.test_user"
+        exporter.message = export_message
+        exporter.on_message()
+
+        mock_api_client_cls.assert_called_once_with("http://test")
+        mock_api_client.warcs.assert_called_once_with(seedset_id="005b131f5f854402afa2b08a4b7ba960", seed_ids=[],
+                                                      harvest_date_end=None, harvest_date_start=None)
+        mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, [])
+
+        self.assertTrue(exporter.export_result.success)
+        txt_filepath = os.path.join(self.export_path, "test1.txt")
+        self.assertTrue(os.path.exists(txt_filepath))
+        with open(txt_filepath, "r") as f:
+            lines = f.readlines()
+        self.assertEqual(2, len(lines))
+        self.assertEqual("k2v1\n", lines[0])
+
+        name, _, kwargs = mock_producer.mock_calls[0]
+        self.assertEqual("publish", name)
+        self.assertEqual("export.status.test.test_user", kwargs["routing_key"])
+        export_status_message = kwargs["body"]
+        self.assertEqual("completed success", export_status_message["status"])
+        self.assertEqual("test1", export_status_message["id"])
+
+    @patch("sfmutils.exporter.ApiClient", autospec=True)
+    def test_export_seeds(self, mock_api_client_cls):
         mock_warc_iter_cls = MagicMock()
         mock_table_cls = MagicMock()
         mock_table = MagicMock(spec=BaseTable)
@@ -142,7 +203,9 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(seedset_id=None, seed_ids = ["005b131f5f854402afa2b08a4b7ba960", "105b131f5f854402afa2b08a4b7ba960"], harvest_date_start=None, harvest_date_end=None)
+        mock_api_client.warcs.assert_called_once_with(seedset_id=None, seed_ids=["005b131f5f854402afa2b08a4b7ba960",
+                                                                                 "105b131f5f854402afa2b08a4b7ba960"],
+                                                      harvest_date_start=None, harvest_date_end=None)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, ["uid1", "uid2"])
 
         self.assertTrue(exporter.export_result.success)
@@ -152,11 +215,8 @@ class TestExporter(tests.TestCase):
             lines = f.readlines()
         self.assertEqual(3, len(lines))
 
-
     @patch("sfmutils.exporter.ApiClient", autospec=True)
-    # Mock out Producer
-    @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_export_seedset_missing_warc(self, mock_producer_cls, mock_api_client_cls):
+    def test_export_seedset_missing_warc(self, mock_api_client_cls):
         mock_api_client = MagicMock(spec=ApiClient)
         mock_api_client_cls.side_effect = [mock_api_client]
 
@@ -187,14 +247,16 @@ class TestExporter(tests.TestCase):
         self.assertFalse(exporter.export_result.success)
         self.assertEqual(CODE_BAD_REQUEST, exporter.export_result.errors[0].code)
 
-
     @patch("sfmutils.exporter.ApiClient", autospec=True)
     # Mock out Producer
     @patch("sfmutils.consumer.Producer", autospec=True)
     def test_export_seedset_and_seeds(self, mock_producer_cls, mock_api_client_cls):
         mock_api_client = MagicMock(spec=ApiClient)
         mock_api_client_cls.side_effect = [mock_api_client]
-        warcs = [{"warc_id":"9dc0b9c3a93a49eb8f713330b43f954c","path":"xtest_1-20151202165907873-00000-306-60892de9dfc6-8001.warc.gz","sha1":"000ffb3371eadb507d77d181ca3f0c5d3c74a2fc","bytes":460518,"date_created":"2016-02-22T14:49:07Z"}]
+        warcs = [{"warc_id": "9dc0b9c3a93a49eb8f713330b43f954c",
+                  "path": "xtest_1-20151202165907873-00000-306-60892de9dfc6-8001.warc.gz",
+                  "sha1": "000ffb3371eadb507d77d181ca3f0c5d3c74a2fc", "bytes": 460518,
+                  "date_created": "2016-02-22T14:49:07Z"}]
         mock_api_client.warcs.side_effect = [warcs]
 
         mock_connection = MagicMock(spec=Connection)
@@ -223,7 +285,8 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(seedset_id="005b131f5f854402afa2b08a4b7ba960", seed_ids = [], harvest_date_end=None, harvest_date_start=None)
+        mock_api_client.warcs.assert_called_once_with(seedset_id="005b131f5f854402afa2b08a4b7ba960", seed_ids=[],
+                                                      harvest_date_end=None, harvest_date_start=None)
 
         self.assertFalse(exporter.export_result.success)
 
@@ -238,12 +301,12 @@ class TestExporter(tests.TestCase):
         self.assertTrue(CODE_WARC_MISSING, export_status_message["errors"][0]["code"])
         self.assertTrue(CODE_NO_WARCS, export_status_message["errors"][0]["code"])
 
-
     def test_export_full_json(self):
         mock_warc_iter_cls = MagicMock()
         mock_warc_iter = MagicMock()
         mock_warc_iter_cls.side_effect = [mock_warc_iter]
-        mock_warc_iter.iter.return_value = [(None, None, None, {"key1": "k1v1", "key2": "k2v1", "key3": "k3v1"}), (None, None, None, { "key1": "k1v2", "key2": "k2v2", "key3": "k3v2"})]
+        mock_warc_iter.iter.return_value = [(None, None, None, {"key1": "k1v1", "key2": "k2v1", "key3": "k3v1"}),
+                                            (None, None, None, {"key1": "k1v2", "key2": "k2v2", "key3": "k3v2"})]
 
         export_filepath = os.path.join(self.export_path, "test.json")
         now = datetime.datetime.now()
@@ -265,15 +328,14 @@ class TestExporter(tests.TestCase):
 
 class TestableTable(BaseTable):
     def _header_row(self):
-        return ("key1", "key2", "key3")
+        return "key1", "key2", "key3"
 
     def _row(self, item):
-        return (item["key1"], item["key2"], item["key3"])
+        return item["key1"], item["key2"], item["key3"]
 
 
 class TestBaseTable(tests.TestCase):
     def setUp(self):
-        # warc_base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "warcs/1/2016/02/22")
         self.warc_paths = ("/collection1/warc1.warc.gz", "/collection1/warc2.warc.gz")
 
     def test_table(self):
@@ -281,7 +343,8 @@ class TestBaseTable(tests.TestCase):
         mock_warc_iter_cls = MagicMock()
         mock_warc_iter = MagicMock()
         mock_warc_iter_cls.side_effect = [mock_warc_iter]
-        mock_warc_iter.iter.return_value = [(None, None, None, { "key1": "k1v1", "key2": "k2v1", "key3": "k3v1"}), (None, None, None, { "key1": "k1v2", "key2": "k2v2", "key3": "k3v2"})]
+        mock_warc_iter.iter.return_value = [(None, None, None, {"key1": "k1v1", "key2": "k2v1", "key3": "k3v1"}),
+                                            (None, None, None, {"key1": "k1v2", "key2": "k2v2", "key3": "k3v2"})]
         now = datetime.datetime.now()
         limit_uids = [11, 14]
 
@@ -301,8 +364,6 @@ class TestBaseTable(tests.TestCase):
                 self.assertEqual("k2v1", row[1])
                 self.assertEqual("k3v1", row[2])
         self.assertEqual(2, count)
-
-
 
         mock_warc_iter_cls.assert_called_with(self.warc_paths, limit_uids)
         mock_warc_iter.iter.assert_called_once_with(dedupe=True, item_date_end=None, item_date_start=now)

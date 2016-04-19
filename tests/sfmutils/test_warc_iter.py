@@ -6,9 +6,6 @@ from sfmutils.warc_iter import BaseWarcIter
 
 
 class TestableNotLineOrientedWarcIter(BaseWarcIter):
-    def _select_record(self, url):
-        return True
-
     def _item_iter(self, url, json_obj):
             for status in json_obj["statuses"]:
                 # Sat Apr 26 16:12:04 +0000 2014

@@ -100,7 +100,7 @@ class BaseWarcIter:
         """
         Return True to select this item. This allows a WarcIter to filter items.
         """
-        pass
+        return True
 
     def print_iter(self, pretty=False, fp=sys.stdout, limit_item_types=None, print_item_type=False, dedupe=False):
         for item_type,_, _,item in self.iter(limit_item_types=limit_item_types, dedupe=dedupe):
