@@ -99,13 +99,13 @@ class TestBaseHarvester(tests.TestCase):
     # Mock out Producer
     @patch("sfmutils.consumer.Producer", autospec=True)
     def test_consume(self, mock_producer_class, mock_warced_class, mock_tempfile):
-        test_collection_path = tempfile.mkdtemp()
+        test_harvest_path = tempfile.mkdtemp()
         # Setup
         message = {
             "id": "test:1",
+            "path": test_harvest_path,
             "collection": {
-                "id": "test_collection",
-                "path": test_collection_path
+                "id": "test_collection"
             }
         }
         mock_connection = MagicMock(spec=Connection)
@@ -142,9 +142,9 @@ class TestBaseHarvester(tests.TestCase):
 
         # Warcs moved
         self.assertTrue(os.path.exists(
-            os.path.join(test_collection_path,
+            os.path.join(test_harvest_path,
                          "2015/11/09/19/test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000.warc.gz")))
-        shutil.rmtree(test_collection_path)
+        shutil.rmtree(test_harvest_path)
 
         # Web harvest
         name1, _, kwargs1 = mock_producer1.mock_calls[0]
@@ -164,7 +164,7 @@ class TestBaseHarvester(tests.TestCase):
             }
         ], web_harvest_message["seeds"])
         self.assertEqual("test_collection", web_harvest_message["collection"]["id"])
-        self.assertEqual(test_collection_path, web_harvest_message["collection"]["path"])
+        self.assertEqual(test_harvest_path, web_harvest_message["path"])
 
         # Warc created message
         name2, _, kwargs2 = mock_producer2.mock_calls[0]
@@ -173,9 +173,8 @@ class TestBaseHarvester(tests.TestCase):
         warc_created_message = kwargs2["body"]
         self.assertEqual(warc_created_message["harvest"]["id"], "test:1")
         self.assertEqual(warc_created_message["collection"]["id"], "test_collection")
-        self.assertEqual(warc_created_message["collection"]["path"], test_collection_path)
         self.assertEqual(warc_created_message["warc"]["path"],
-                         os.path.join(test_collection_path,
+                         os.path.join(test_harvest_path,
                                       "2015/11/09/19/test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000.warc.gz"))
         self.assertEqual(warc_created_message["warc"]["sha1"], "3d63d3c46d5dfac8495621c9c697e2089e5359b2")
         self.assertEqual(warc_created_message["warc"]["bytes"], 9)
@@ -226,13 +225,13 @@ class TestBaseHarvester(tests.TestCase):
     # Mock out Producer
     @patch("sfmutils.consumer.Producer", autospec=True)
     def test_consume_with_exception(self, mock_producer_class, mock_warced_class, mock_tempfile):
-        test_collection_path = tempfile.mkdtemp()
+        test_harvest_path = tempfile.mkdtemp()
         # Setup
         message = {
             "id": "test:1",
+            "path": test_harvest_path,
             "collection": {
-                "id": "test_collection",
-                "path": test_collection_path
+                "id": "test_collection"
             }
         }
 
@@ -286,13 +285,13 @@ class TestBaseHarvester(tests.TestCase):
     # Mock out warcprox.
     @patch("sfmutils.harvester.warced", autospec=True)
     def test_harvest_from_file(self, mock_warced_class, mock_tempfile):
-        test_collection_path = tempfile.mkdtemp()
+        test_harvest_path = tempfile.mkdtemp()
         # Setup
         message = {
             "id": "test:1",
+            "path": test_harvest_path,
             "collection": {
-                "id": "test_collection",
-                "path": test_collection_path
+                "id": "test_collection"
             }
         }
 
@@ -325,9 +324,9 @@ class TestBaseHarvester(tests.TestCase):
 
         # Warcs moved
         self.assertTrue(os.path.exists(
-            os.path.join(test_collection_path,
+            os.path.join(test_harvest_path,
                          "2015/11/09/19/test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000.warc.gz")))
-        shutil.rmtree(test_collection_path)
+        shutil.rmtree(test_harvest_path)
 
         # Test harvest result message
         self.assertTrue(harvester.harvest_result.success)
@@ -359,7 +358,7 @@ class TestBaseHarvester(tests.TestCase):
         self.assertDictEqual({
             "library_of_congress": "671366249@N03"
         }, harvester.harvest_result.uids)
-        self.assertListEqual([os.path.join(test_collection_path,
+        self.assertListEqual([os.path.join(test_harvest_path,
                               "2015/11/09/19/test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000.warc.gz")],
                              harvester.harvest_result.warcs)
         self.assertEqual(1, len(harvester.harvest_result.warcs))
@@ -390,13 +389,13 @@ class TestBaseHarvester(tests.TestCase):
     # Mock out Producer
     @patch("sfmutils.consumer.Producer", autospec=True)
     def test_stream(self, mock_producer_class, mock_warced_class, mock_tempfile):
-        test_collection_path = tempfile.mkdtemp()
+        test_harvest_path = tempfile.mkdtemp()
         # Setup
         message = {
             "id": "test:1",
+            "path": test_harvest_path,
             "collection": {
-                "id": "test_collection",
-                "path": test_collection_path
+                "id": "test_collection"
             }
         }
 
@@ -449,12 +448,12 @@ class TestBaseHarvester(tests.TestCase):
 
         # Warcs moved
         self.assertTrue(os.path.exists(
-            os.path.join(test_collection_path,
+            os.path.join(test_harvest_path,
                          "2015/11/09/19/test_1-20151109195229879-00004-97528-GLSS-F0G5RP-8000.warc.gz")))
         self.assertTrue(os.path.exists(
-            os.path.join(test_collection_path,
+            os.path.join(test_harvest_path,
                          "2015/11/09/19/test_1-20151109195229879-00008-97528-GLSS-F0G5RP-8000.warc.gz")))
-        shutil.rmtree(test_collection_path)
+        shutil.rmtree(test_harvest_path)
 
         # Web harvest
         name1, _, kwargs1 = mock_producer1.mock_calls[0]
@@ -467,7 +466,7 @@ class TestBaseHarvester(tests.TestCase):
         self.assertEqual("test:1", web_harvest_message1["parent_id"])
         self.assertEqual("web", web_harvest_message1["type"])
         self.assertEqual("test_collection", web_harvest_message1["collection"]["id"])
-        self.assertEqual(test_collection_path, web_harvest_message1["collection"]["path"])
+        self.assertEqual(test_harvest_path, web_harvest_message1["path"])
         # Contains some token
         self.assertTrue(len(web_harvest_message1["seeds"]))
         self.assertTrue(web_harvest_message1["seeds"][0]["token"].startswith("http://www."))
@@ -478,9 +477,8 @@ class TestBaseHarvester(tests.TestCase):
         self.assertEqual("warc_created", kwargs2["routing_key"])
         warc_created_message = kwargs2["body"]
         self.assertEqual(warc_created_message["collection"]["id"], "test_collection")
-        self.assertEqual(warc_created_message["collection"]["path"], test_collection_path)
         self.assertEqual(warc_created_message["warc"]["path"],
-                         os.path.join(test_collection_path,
+                         os.path.join(test_harvest_path,
                                       "2015/11/09/19/test_1-20151109195229879-00004-97528-GLSS-F0G5RP-8000.warc.gz"))
         self.assertEqual(warc_created_message["warc"]["sha1"], "3d63d3c46d5dfac8495621c9c697e2089e5359b2")
         self.assertEqual(warc_created_message["warc"]["bytes"], 9)
@@ -536,7 +534,7 @@ class TestBaseHarvester(tests.TestCase):
         self.assertEqual("warc_created", kwargs5["routing_key"])
         warc_created_message2 = kwargs5["body"]
         self.assertEqual(warc_created_message2["warc"]["path"],
-                         os.path.join(test_collection_path,
+                         os.path.join(test_harvest_path,
                                       "2015/11/09/19/test_1-20151109195229879-00008-97528-GLSS-F0G5RP-8000.warc.gz"))
         self.assertEqual(32, len(warc_created_message2["warc"]["id"]))
 

@@ -152,14 +152,14 @@ class BaseHarvester(BaseConsumer):
     def _process(self, done=True):
         harvest_id = self.message["id"]
         collection_id = self. message["collection"]["id"]
-        collection_path = self.message["collection"]["path"]
+        harvest_path = self.message["path"]
 
         # Acquire a lock
         with self.harvest_result_lock:
             if self.harvest_result.success:
                 # Send web harvest message
                 self._send_web_harvest_message(harvest_id, collection_id,
-                                               collection_path, self.harvest_result.urls_as_set())
+                                               harvest_path, self.harvest_result.urls_as_set())
                 # Since the urls were sent, clear them
                 if not done:
                     self.harvest_result.urls = []
@@ -169,11 +169,12 @@ class BaseHarvester(BaseConsumer):
                     # Move the warc
                     dest_warc_filepath = self._move_file(warc_filename,
                                                          self.warc_temp_dir,
-                                                         self._path_for_warc(collection_path, warc_filename))
+                                                         self._path_for_warc(harvest_path, warc_filename))
                     self.harvest_result.add_warc(dest_warc_filepath)
                     # Send warc created message
-                    self._send_warc_created_message(harvest_id, collection_id, collection_path,
-                                                    uuid.uuid4().hex, dest_warc_filepath)
+                    self._send_warc_created_message(harvest_id, collection_id,
+                                                    uuid.uuid4().hex,
+                                                    dest_warc_filepath)
 
             # TODO: Persist summary so that can resume
 
@@ -227,7 +228,7 @@ class BaseHarvester(BaseConsumer):
         """
         Creates a state store for the harvest.
         """
-        self.state_store = JsonHarvestStateStore(self.message["collection"]["path"])
+        self.state_store = JsonHarvestStateStore(self.message["path"])
 
     @staticmethod
     def _list_warcs(path):
@@ -235,10 +236,10 @@ class BaseHarvester(BaseConsumer):
                 (f.endswith(".warc") or f.endswith(".warc.gz"))]
 
     @staticmethod
-    def _path_for_warc(collection_path, filename):
+    def _path_for_warc(harvest_path, filename):
         m = re.search("-(\d{4})(\d{2})(\d{2})(\d{2})\d{7}-", filename)
         assert m
-        return "/".join([collection_path, m.group(1), m.group(2), m.group(3), m.group(4)])
+        return "/".join([harvest_path, m.group(1), m.group(2), m.group(3), m.group(4)])
 
     @staticmethod
     def _move_file(filename, src_path, dest_path):
@@ -250,15 +251,15 @@ class BaseHarvester(BaseConsumer):
         shutil.move(src_filepath, dest_filepath)
         return dest_filepath
 
-    def _send_web_harvest_message(self, harvest_id, collection_id, collection_path, urls):
+    def _send_web_harvest_message(self, harvest_id, collection_id, harvest_path, urls):
         message = {
             "id": uuid.uuid4().hex,
             "parent_id": harvest_id,
+            "path": harvest_path,
             "type": "web",
             "seeds": [],
             "collection": {
-                "id": collection_id,
-                "path": collection_path
+                "id": collection_id
             }
         }
         for url in urls:
@@ -291,15 +292,13 @@ class BaseHarvester(BaseConsumer):
         status_routing_key = harvest_routing_key.replace("start", "status")
         self._publish_message(status_routing_key, message)
 
-    def _send_warc_created_message(self, harvest_id, collection_id, collection_path, warc_id, warc_path):
+    def _send_warc_created_message(self, harvest_id, collection_id, warc_id, warc_path):
         message = {
             "harvest": {
                 "id": harvest_id
             },
             "collection": {
-                "id": collection_id,
-                "path": collection_path
-
+                "id": collection_id
             },
             "warc": {
                 "id": warc_id,
