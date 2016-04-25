@@ -1,5 +1,5 @@
 # sfm-utils
-Utilities for Social Feed Manager.
+Utilities for [Social Feed Manager](https://gwu-libraries.github.io/sfm-ui).
 
 [![Build Status](https://travis-ci.org/gwu-libraries/sfm-utils.svg?branch=master)](https://travis-ci.org/gwu-libraries/sfm-utils)
 
