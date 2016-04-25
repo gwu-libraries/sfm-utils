@@ -83,7 +83,7 @@ class BaseWarcIter:
         pass
 
     def print_iter(self, pretty=False, fp=sys.stdout, limit_item_types=None, print_item_type=False, dedupe=False):
-        for item_type, item in self.iter(limit_item_types=limit_item_types, dedupe=dedupe):
+        for item_type,_, _,item in self.iter(limit_item_types=limit_item_types, dedupe=dedupe):
             if print_item_type:
                 fp.write("{}:".format(item_type))
             json.dump(item, fp, indent=4 if pretty else None)
