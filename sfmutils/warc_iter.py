@@ -28,12 +28,23 @@ class BaseWarcIter:
     def __iter__(self):
         return self.iter()
 
+    def _should_debug(self, count):
+        if count <= 100 and count % 10 == 0:
+            return True
+        elif 100 < count and count % 100 == 0:
+            return True
+        return False
+
     def iter(self, limit_item_types=None, dedupe=False, item_date_start=None, item_date_end=None):
         seen_ids = {}
         for filepath in self.filepaths:
             log.info("Iterating over %s", filepath)
             f = warc.WARCResponseFile(filepath)
-            for record in f:
+            yield_count = 0
+            for record_count, record in enumerate(f):
+                if self._should_debug(record_count):
+                    log.debug("Processed %s records. Yielded %s items.", record_count, yield_count)
+
                 if self._select_record(record.url):
                     # An iterator over json objects which constitute the payload of a record.
                     if not self.line_oriented:
@@ -69,6 +80,7 @@ class BaseWarcIter:
                                         seen_ids[item_id] = True
                                 if yield_item:
                                     if item is not None:
+                                        yield_count += 1
                                         yield item_type, item_id, item_date, item
                                     else:
                                         log.warn("Bad response in record %s", record.header.record_id)
