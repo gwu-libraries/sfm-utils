@@ -86,7 +86,7 @@ class BaseHarvester(BaseConsumer):
 
     Subclasses should overrride harvest_seeds().
     """
-    def __init__(self, mq_config=None, process_interval_secs=1200, debug=False):
+    def __init__(self, mq_config=None, process_interval_secs=1200, debug=False, use_warcprox=True):
         BaseConsumer.__init__(self, mq_config=mq_config)
         self.process_interval_secs = process_interval_secs
 
@@ -99,6 +99,7 @@ class BaseHarvester(BaseConsumer):
         self.process_timer = None
         self.state_store = None
         self.debug = debug
+        self.use_warcprox = use_warcprox
 
     def on_message(self):
         assert self.message
@@ -133,7 +134,10 @@ class BaseHarvester(BaseConsumer):
             self.process_timer.start()
 
         try:
-            with warced(prefix, self.warc_temp_dir, debug=self.debug):
+            if self.use_warcprox:
+                with warced(prefix, self.warc_temp_dir, debug=self.debug):
+                    self.harvest_seeds()
+            else:
                 self.harvest_seeds()
         except Exception as e:
             log.exception("Unknown error raised during harvest")
@@ -158,8 +162,13 @@ class BaseHarvester(BaseConsumer):
         with self.harvest_result_lock:
             if self.harvest_result.success:
                 # Send web harvest message
-                self._send_web_harvest_message(harvest_id, collection_id,
-                                               harvest_path, self.harvest_result.urls_as_set())
+                urls_set = self.harvest_result.urls_as_set()
+                if urls_set:
+                    self._send_web_harvest_message(harvest_id, collection_id,
+                                                   harvest_path, urls_set)
+                else:
+                    log.debug("No urls, so not sending a web harvest message.")
+
                 # Since the urls were sent, clear them
                 if not done:
                     self.harvest_result.urls = []
