@@ -10,7 +10,6 @@ import sys
 import threading
 import signal
 from collections import Counter
-import uuid
 import os
 import re
 import codecs
@@ -119,9 +118,8 @@ class BaseHarvester(BaseConsumer):
 
         log.debug("Message is %s" % json.dumps(self.message, indent=4))
 
-        prefix = safe_string(self.message["id"])
         # Create a temp directory for WARCs
-        self.warc_temp_dir = tempfile.mkdtemp(prefix=prefix)
+        self.warc_temp_dir = self._create_warc_temp_dir()
         self._create_state_store()
 
         # Setup the process timer
@@ -135,7 +133,7 @@ class BaseHarvester(BaseConsumer):
 
         try:
             if self.use_warcprox:
-                with warced(prefix, self.warc_temp_dir, debug=self.debug):
+                with warced(safe_string(self.message["id"]), self.warc_temp_dir, debug=self.debug):
                     self.harvest_seeds()
             else:
                 self.harvest_seeds()
@@ -318,6 +316,14 @@ class BaseHarvester(BaseConsumer):
             }
         }
         self._publish_message("warc_created", message)
+
+    def _create_warc_temp_dir(self):
+        """
+        Create temporary directory for WARC files.
+
+        :return: the directory path
+        """
+        return tempfile.mkdtemp(prefix=safe_string(self.message["id"]))
 
     @staticmethod
     def main(cls, queue, routing_keys):
