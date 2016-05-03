@@ -85,16 +85,15 @@ class BaseHarvester(BaseConsumer):
 
     Subclasses should overrride harvest_seeds().
     """
-    def __init__(self, mq_config=None, process_interval_secs=1200, debug=False, use_warcprox=True):
+    def __init__(self, mq_config=None, stream_restart_interval_secs=30 * 60, debug=False, use_warcprox=True):
         BaseConsumer.__init__(self, mq_config=mq_config)
-        self.process_interval_secs = process_interval_secs
-
+        self.stream_restart_interval_secs = stream_restart_interval_secs
         self.is_streaming = False
         self.harvest_result = None
-        self.harvest_result_lock = None
         self.routing_key = ""
         self.warc_temp_dir = None
         self.stop_event = None
+        self.terminate_event = None
         self.process_timer = None
         self.state_store = None
         self.debug = debug
@@ -107,14 +106,15 @@ class BaseHarvester(BaseConsumer):
 
         self.harvest_result = HarvestResult()
         self.harvest_result.started = datetime.datetime.now()
-        self.harvest_result_lock = threading.Lock()
-        self.stop_event = threading.Event()
+        self.terminate_event = threading.Event()
 
-        def set_stop_event(signal_number, stack_frame):
+        def terminate(signal_number, stack_frame):
+            log.debug("Terminate triggered")
+            self.terminate_event.set()
             self.stop_event.set()
 
-        signal.signal(signal.SIGTERM, set_stop_event)
-        signal.signal(signal.SIGINT, set_stop_event)
+        signal.signal(signal.SIGTERM, terminate)
+        signal.signal(signal.SIGINT, terminate)
 
         log.debug("Message is %s" % json.dumps(self.message, indent=4))
 
@@ -122,30 +122,44 @@ class BaseHarvester(BaseConsumer):
         self.warc_temp_dir = self._create_warc_temp_dir()
         self._create_state_store()
 
-        # Setup the process timer
-        def process_it(h):
-            h._process(done=False)
-            h.process_timer = threading.Timer(h.process_interval_secs, process_it, args=[h])
+        # Setup the restart timer for streams
+        # The restart timer stops and restarts the stream periodically.
+        # Makes makes sure that each HTTP response is limited in size.
+        def restart_stream(h):
+            log.debug("Restarting stream.")
+            h.stop_event.set()
+            h.process_timer = threading.Timer(h.stream_restart_interval_secs, restart_stream, args=[h])
             h.process_timer.start()
         if self.is_streaming:
-            self.process_timer = threading.Timer(self.process_interval_secs, process_it, args=[self])
+            self.process_timer = threading.Timer(self.stream_restart_interval_secs, restart_stream, args=[self])
             self.process_timer.start()
 
-        try:
-            if self.use_warcprox:
-                with warced(safe_string(self.message["id"]), self.warc_temp_dir, debug=self.debug):
+        while not self.terminate_event.is_set():
+            self.stop_event = threading.Event()
+            # If this isn't streaming then set terminate event so that looping doesn't occur.
+            if not self.is_streaming:
+                self.terminate_event.set()
+            try:
+                if self.use_warcprox:
+                    with warced(safe_string(self.message["id"]), self.warc_temp_dir, debug=self.debug,
+                                interrupt=self.is_streaming):
+                        self.harvest_seeds()
+                else:
                     self.harvest_seeds()
+                log.debug("Exited harvesting seeds.")
+            except Exception as e:
+                log.exception("Unknown error raised during harvest")
+                self.harvest_result.success = False
+                self.harvest_result.errors.append(Msg(CODE_UNKNOWN_ERROR, str(e)))
+                self.terminate_event.set()
+            # Process differently depending on if terminating
+            if self.terminate_event.isSet():
+                self.harvest_result.ended = datetime.datetime.now()
+                if self.process_timer:
+                    self.process_timer.cancel()
+                self._process(done=True)
             else:
-                self.harvest_seeds()
-        except Exception as e:
-            log.exception("Unknown error raised during harvest")
-            self.harvest_result.success = False
-            self.harvest_result.errors.append(Msg(CODE_UNKNOWN_ERROR, str(e)))
-        self.harvest_result.ended = datetime.datetime.now()
-        if self.process_timer:
-            self.process_timer.cancel()
-
-        self._process()
+                self._process(done=False)
 
         # Delete temp dir
         if os.path.exists(self.warc_temp_dir):
@@ -157,51 +171,49 @@ class BaseHarvester(BaseConsumer):
         harvest_path = self.message["path"]
         harvest_type = self.message["type"]
 
-        # Acquire a lock
-        with self.harvest_result_lock:
-            if self.harvest_result.success:
-                # Send web harvest message
-                urls_set = self.harvest_result.urls_as_set()
-                if urls_set:
-                    self._send_web_harvest_message(harvest_id, collection_id,
-                                                   harvest_path, urls_set)
-                else:
-                    log.debug("No urls, so not sending a web harvest message.")
+        if self.harvest_result.success:
+            # Send web harvest message
+            urls_set = self.harvest_result.urls_as_set()
+            if urls_set:
+                self._send_web_harvest_message(harvest_id, collection_id,
+                                               harvest_path, urls_set)
+            else:
+                log.debug("No urls, so not sending a web harvest message.")
 
-                # Since the urls were sent, clear them
-                if not done:
-                    self.harvest_result.urls = []
+            # Since the urls were sent, clear them
+            if not done:
+                self.harvest_result.urls = []
 
-                # Process warc files
-                for warc_filename in self._list_warcs(self.warc_temp_dir):
-                    # Move the warc
-                    dest_warc_filepath = self._move_file(warc_filename,
-                                                         self.warc_temp_dir,
-                                                         self._path_for_warc(harvest_path, warc_filename))
-                    self.harvest_result.add_warc(dest_warc_filepath)
-                    # Send warc created message
-                    self._send_warc_created_message(harvest_id, harvest_type,
-                                                    collection_id,
-                                                    uuid.uuid4().hex,
-                                                    dest_warc_filepath)
+            # Process warc files
+            for warc_filename in self._list_warcs(self.warc_temp_dir):
+                # Move the warc
+                dest_warc_filepath = self._move_file(warc_filename,
+                                                     self.warc_temp_dir,
+                                                     self._path_for_warc(harvest_path, warc_filename))
+                self.harvest_result.add_warc(dest_warc_filepath)
+                # Send warc created message
+                self._send_warc_created_message(harvest_id, harvest_type,
+                                                collection_id,
+                                                uuid.uuid4().hex,
+                                                dest_warc_filepath)
 
             # TODO: Persist summary so that can resume
 
-            if not self.harvest_result.success:
-                status = STATUS_FAILURE
-            elif not done:
-                status = STATUS_RUNNING
-            else:
-                status = STATUS_SUCCESS
-            self._send_status_message(self.routing_key, harvest_id,
-                                      self.harvest_result, status)
-            if not done:
-                # Since these were sent, clear them.
-                self.harvest_result.errors = []
-                self.harvest_result.infos = []
-                self.harvest_result.warnings = []
-                self.harvest_result.token_updates = []
-                self.harvest_result.uids = []
+        if not self.harvest_result.success:
+            status = STATUS_FAILURE
+        elif not done:
+            status = STATUS_RUNNING
+        else:
+            status = STATUS_SUCCESS
+        self._send_status_message(self.routing_key, harvest_id,
+                                  self.harvest_result, status)
+        if not done:
+            # Since these were sent, clear them.
+            self.harvest_result.errors = []
+            self.harvest_result.infos = []
+            self.harvest_result.warnings = []
+            self.harvest_result.token_updates = {}
+            self.harvest_result.uids = {}
 
     def harvest_from_file(self, filepath, routing_key=None, is_streaming=False):
         """
@@ -241,8 +253,11 @@ class BaseHarvester(BaseConsumer):
 
     @staticmethod
     def _list_warcs(path):
-        return [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and
+        warcs = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and
                 (f.endswith(".warc") or f.endswith(".warc.gz"))]
+        if len(warcs) == 0:
+            log.warning("No warcs found in %s", path)
+        return warcs
 
     @staticmethod
     def _path_for_warc(harvest_path, filename):
@@ -274,7 +289,7 @@ class BaseHarvester(BaseConsumer):
         for url in urls:
             message["seeds"].append({"token": url})
 
-        self._publish_message("harvest.start.web", message)
+        self._publish_message("harvest.start.web", message, trunate_debug_length=5000)
 
     def _send_status_message(self, harvest_routing_key, harvest_id, harvest_result, status):
         # Just add additional info to job message

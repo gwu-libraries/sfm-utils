@@ -15,7 +15,7 @@ class TestExporter(tests.TestCase):
     def setUp(self):
         self.warc_base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "warcs")
         self.warcs = [{"warc_id": "9dc0b9c3a93a49eb8f713330b43f954c",
-                       "path": "test_1-20151202165907873-00000-306-60892de9dfc6-8001.warc.gz",
+                       "path": "test_1-20151202200525007-00000-30033-GLSS-F0G5RP-8000.warc.gz",
                        "sha1": "000ffb3371eadb507d77d181ca3f0c5d3c74a2fc", "bytes": 460518,
                        "date_created": "2016-02-22T14:49:07Z"}, {"warc_id": "d3f524b52de0495b9abbf3b36b1fb06f",
                                                                  "path": "test_1-20151202190229530-00000-29525-GLSS-" +
@@ -24,7 +24,7 @@ class TestExporter(tests.TestCase):
                                                                  "bytes": 58048,
                                                                  "date_created": "2016-02-22T14:37:26Z"}]
         self.warc_filepaths = [
-            os.path.join(self.warc_base_path, "test_1-20151202165907873-00000-306-60892de9dfc6-8001.warc.gz"),
+            os.path.join(self.warc_base_path, "test_1-20151202200525007-00000-30033-GLSS-F0G5RP-8000.warc.gz"),
             os.path.join(self.warc_base_path, "test_1-20151202190229530-00000-29525-GLSS-F0G5RP-8000.warc.gz")]
         self.export_path = tempfile.mkdtemp()
 

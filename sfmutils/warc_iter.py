@@ -62,9 +62,13 @@ class BaseWarcIter:
                         # A line-oriented payload has many payload parts.
                         payload_parts_iter = self._iter_lines(record.http_response)
                     for payload_part in payload_parts_iter:
+                        json_obj = None
                         try:
                             # A non-line-oriented payload only has one payload part.
                             json_obj = json.loads(payload_part)
+                        except ValueError:
+                            log.warn("Bad json in record %s: %s", record.header.record_id, payload_part)
+                        if json_obj:
                             for item_type, item_id, item_date, item in self._item_iter(record.url, json_obj):
                                 yield_item = True
                                 if limit_item_types and item_type not in limit_item_types:
@@ -86,8 +90,6 @@ class BaseWarcIter:
                                         yield item_type, item_id, item_date, item
                                     else:
                                         log.warn("Bad response in record %s", record.header.record_id)
-                        except ValueError:
-                            log.warn("Bad json in record %s", record.header.record_id)
 
     def _select_record(self, url):
         """
@@ -165,6 +167,9 @@ class BaseWarcIter:
 
     @staticmethod
     def main(cls):
+        # Logging
+        logging.basicConfig(format='%(asctime)s: %(name)s --> %(message)s', level=logging.DEBUG)
+
         parser = argparse.ArgumentParser()
         item_types = cls.item_types()
         if len(item_types) > 1:
@@ -174,9 +179,16 @@ class BaseWarcIter:
         parser.add_argument("--pretty", action="store_true", help="Format the json for viewing.")
         parser.add_argument("--dedupe", action="store_true", help="Remove duplicate items.")
         parser.add_argument("--print-item-type", action="store_true", help="Print the item type.")
+        parser.add_argument("--debug", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
+                            default="False", const="True")
         parser.add_argument("filepaths", nargs="+", help="Filepath of the warc.")
 
         args = parser.parse_args()
+
+        # Logging
+        logging.basicConfig(format='%(asctime)s: %(name)s --> %(message)s',
+                            level=logging.DEBUG if args.debug else logging.INFO)
+
         main_limit_item_types = args.item_types.split(",") if "item_types" in vars(args) else None
 
         cls(args.filepaths).print_iter(limit_item_types=main_limit_item_types, pretty=args.pretty,

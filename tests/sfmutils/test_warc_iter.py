@@ -72,16 +72,7 @@ class TestWarcIter(TestCase):
             self._warc_filepath("test_1-20151202190229530-00000-29525-GLSS-F0G5RP-8000.warc.gz")).iter(
             ["not_twitter_status"]))))
 
-    def test_line_oriented_with_continuations(self):
-        count = 0
-        for count, (item_type, item_id, item_date, item) in enumerate(
-                TestableLineOrientedWarcIter(
-                    self._warc_filepath("test_1-20151202165907873-00000-306-60892de9dfc6-8001.warc.gz")), start=1):
-            self.assertEqual("twitter_status", item_type)
-            self.assertTrue(item.get("id"))
-        self.assertEqual(1, count)
-
-    def test_line_oriented_without_continuations(self):
+    def test_line_oriented(self):
         count = 0
         for count, (item_type, item_id, item_date, item) in enumerate(
                 TestableLineOrientedWarcIter(

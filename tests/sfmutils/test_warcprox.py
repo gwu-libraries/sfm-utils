@@ -32,14 +32,11 @@ class WarcedTest(TestCase):
 
     def test_generate_commandline(self):
         w = warced("test", "/test")
-        self.assertEqual("warcprox -c {} --certs-dir {} --dedup-db-file /dev/null -d /test -n test -p {} -z "
-                         "--rollover-time 900 --rollover-idle-time 930 -r 100000000 --record-rollover-time 300".format(
+        self.assertEqual("warcprox -c {} --certs-dir {} --dedup-db-file /dev/null -d /test -n test -p {} -z".format(
                           w.ca_bundle, w.ca_dir, w.port), w._generate_commandline())
 
-        w = warced("test", "/test", compress=False, rollover_time=1000, rollover_idle_time=1030, record_size=10000,
-                   record_rollover_time=250)
-        self.assertEqual("warcprox -c {} --certs-dir {} --dedup-db-file /dev/null -d /test -n test -p {} "
-                         "--rollover-time 1000 --rollover-idle-time 1030 -r 10000 --record-rollover-time 250".format(
+        w = warced("test", "/test", compress=False, interrupt=True)
+        self.assertEqual("warcprox -c {} --certs-dir {} --dedup-db-file /dev/null -d /test -n test -p {} -i".format(
                           w.ca_bundle, w.ca_dir, w.port), w._generate_commandline())
 
     def test_with(self):
