@@ -85,8 +85,8 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(seedset_id="005b131f5f854402afa2b08a4b7ba960", seed_ids=[],
-                                                      harvest_date_start=harvest_date_start,
+        mock_api_client.warcs.assert_called_once_with(exclude_web=True, seedset_id="005b131f5f854402afa2b08a4b7ba960",
+                                                      seed_ids=[], harvest_date_start=harvest_date_start,
                                                       harvest_date_end=harvest_date_end)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, True, item_datetime_start, item_datetime_end, [])
 
@@ -148,8 +148,8 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(seedset_id="005b131f5f854402afa2b08a4b7ba960", seed_ids=[],
-                                                      harvest_date_end=None, harvest_date_start=None)
+        mock_api_client.warcs.assert_called_once_with(exclude_web=True, seedset_id="005b131f5f854402afa2b08a4b7ba960",
+                                                      seed_ids=[], harvest_date_end=None, harvest_date_start=None)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, [])
 
         self.assertTrue(exporter.export_result.success)
@@ -203,8 +203,9 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(seedset_id=None, seed_ids=["005b131f5f854402afa2b08a4b7ba960",
-                                                                                 "105b131f5f854402afa2b08a4b7ba960"],
+        mock_api_client.warcs.assert_called_once_with(exclude_web=True, seedset_id=None,
+                                                      seed_ids=["005b131f5f854402afa2b08a4b7ba960",
+                                                                "105b131f5f854402afa2b08a4b7ba960"],
                                                       harvest_date_start=None, harvest_date_end=None)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, ["uid1", "uid2"])
 
@@ -285,8 +286,8 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(seedset_id="005b131f5f854402afa2b08a4b7ba960", seed_ids=[],
-                                                      harvest_date_end=None, harvest_date_start=None)
+        mock_api_client.warcs.assert_called_once_with(exclude_web=True, seedset_id="005b131f5f854402afa2b08a4b7ba960",
+                                                      seed_ids=[], harvest_date_end=None, harvest_date_start=None)
 
         self.assertFalse(exporter.export_result.success)
 

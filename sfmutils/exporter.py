@@ -135,7 +135,8 @@ class BaseExporter(BaseConsumer):
         warc_paths = []
         log.debug("Getting warcs for seedset %s", seedset_id)
         for warc in self.api_client.warcs(seedset_id=seedset_id, seed_ids=seed_ids,
-                                          harvest_date_start=harvest_date_start, harvest_date_end=harvest_date_end):
+                                          harvest_date_start=harvest_date_start, harvest_date_end=harvest_date_end,
+                                          exclude_web=True):
             warc_path = os.path.join(self.warc_base_path, warc["path"]) if self.warc_base_path else warc["path"]
             if os.path.exists(warc_path):
                 warc_paths.append(warc_path)

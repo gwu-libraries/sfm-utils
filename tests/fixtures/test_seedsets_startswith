@@ -1,0 +1,41 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Connection: [keep-alive]
+      User-Agent: [python-requests/2.9.1]
+    method: GET
+    uri: http://192.168.99.100:8081/api/v1/seedsets/?seedset_startswith=8fcb71eb883745
+  response:
+    body: {string: !!python/unicode '[{"seedset_id":"8fcb71eb883745b6aa4ee94767253fc8","harvest_type":"twitter_sample","name":"Twitter
+        sample","is_active":false}]'}
+    headers:
+      allow: ['GET, HEAD, OPTIONS']
+      content-type: [application/json]
+      date: ['Thu, 12 May 2016 21:03:37 GMT']
+      server: [WSGIServer/0.1 Python/2.7.6]
+      vary: ['Accept, Cookie']
+      x-frame-options: [SAMEORIGIN]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Connection: [keep-alive]
+      User-Agent: [python-requests/2.9.1]
+    method: GET
+    uri: http://192.168.99.100:8081/api/v1/seedsets/?seedset_startswith=x8fcb71eb883745
+  response:
+    body: {string: !!python/unicode '[]'}
+    headers:
+      allow: ['GET, HEAD, OPTIONS']
+      content-type: [application/json]
+      date: ['Thu, 12 May 2016 21:03:37 GMT']
+      server: [WSGIServer/0.1 Python/2.7.6]
+      vary: ['Accept, Cookie']
+      x-frame-options: [SAMEORIGIN]
+    status: {code: 200, message: OK}
+version: 1

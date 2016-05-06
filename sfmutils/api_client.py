@@ -24,21 +24,39 @@ class ApiClient:
         resp.raise_for_status()
         return resp.json()
 
-    def warcs(self, seedset_id=None, seed_ids=None, harvest_date_start=None, harvest_date_end=None):
+    def warcs(self, seedset_id=None, seed_ids=None, harvest_date_start=None, harvest_date_end=None,
+              exclude_web=False):
         """
         Iterator over WARC model objects.
 
         :param seedset_id: Limit WARCs to this seedset
         :param seed_ids: Limit WARCs to this list of seeds
-        :param harvest_date_start: Limit to WARCs who harvest started after this datetime
-        :param harvest_date_end: Limit to WARCs who harvest started before this datetime
-        :return:
+        :param harvest_date_start: Limit to WARCs whose harvest started after this datetime
+        :param harvest_date_end: Limit to WARCs whose harvest started before this datetime
+        :param exclude_web: If True, WARCs containing web harvests.
+        :return: WARC iterator
         """
         params = dict()
         params["seedset"] = seedset_id
         params["seed"] = seed_ids
         params["harvest_date_start"] = harvest_date_start
         params["harvest_date_end"] = harvest_date_end
+        if exclude_web:
+            params["exclude_web"] = True
         warcs = self._get("/api/v1/warcs/", params)
         for warc in warcs:
             yield warc
+
+    def seedsets(self, seedset_id_startswith=None):
+        """
+        Iterator over Seedset model objects.
+
+        :param seedset_id_startswith: Limit to seedsets whose seedset_id starts with this value
+        :return: Seedset iterator
+        """
+        params = dict()
+        if seedset_id_startswith:
+            params["seedset_startswith"] = seedset_id_startswith
+        seedsets = self._get("/api/v1/seedsets/", params)
+        for seedset in seedsets:
+            yield seedset
