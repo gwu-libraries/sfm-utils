@@ -73,6 +73,8 @@ class BaseWarcIter:
                                     yield_item = False
                                 if item_date_end and item_date and item_date > item_date_end:
                                     yield_item = False
+                                if not self._select_item(item):
+                                    yield_item = False
                                 if dedupe and yield_item:
                                     if item_id in seen_ids:
                                         yield_item = False
@@ -93,6 +95,12 @@ class BaseWarcIter:
         records for the type of social media content that it handles.
         """
         pass
+
+    def _select_item(self, item):
+        """
+        Return True to select this item. This allows a WarcIter to filter items.
+        """
+        return True
 
     def print_iter(self, pretty=False, fp=sys.stdout, limit_item_types=None, print_item_type=False, dedupe=False):
         for item_type,_, _,item in self.iter(limit_item_types=limit_item_types, dedupe=dedupe):

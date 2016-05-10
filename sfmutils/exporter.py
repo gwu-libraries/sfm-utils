@@ -94,7 +94,11 @@ class BaseExporter(BaseConsumer):
                     filepath = "{}.json".format(base_filepath)
                     log.info("Exporting to %s", filepath)
                     self._full_json_export(warc_paths, filepath, dedupe, item_date_start, item_date_end, seed_uids)
-
+                elif export_format == "dehydrate":
+                    table = self.table_cls(warc_paths, dedupe, item_date_start, item_date_end, seed_uids)
+                    filepath = "{}.txt".format(base_filepath)
+                    log.info("Exporting to %s", filepath)
+                    petl.totext(table, filepath, template="{{{}}}\n".format(table.id_field()))
                 elif export_format in export_formats:
                     table = self.table_cls(warc_paths, dedupe, item_date_start, item_date_end, seed_uids)
                     filepath = "{}.{}".format(base_filepath, export_formats[export_format][0])
@@ -267,6 +271,12 @@ class BaseTable(petl.Table):
         Returns a tuple of values for an item.
         """
         return ()
+
+    def id_field(self):
+        """
+        Name of the field containing the identifier. This should watch one of the header labels.
+        """
+        pass
 
     def __iter__(self):
         # yield the header row
