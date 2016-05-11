@@ -155,6 +155,7 @@ class BaseHarvester(BaseConsumer):
         harvest_id = self.message["id"]
         collection_id = self. message["collection"]["id"]
         harvest_path = self.message["path"]
+        harvest_type = self.message["type"]
 
         # Acquire a lock
         with self.harvest_result_lock:
@@ -179,7 +180,8 @@ class BaseHarvester(BaseConsumer):
                                                          self._path_for_warc(harvest_path, warc_filename))
                     self.harvest_result.add_warc(dest_warc_filepath)
                     # Send warc created message
-                    self._send_warc_created_message(harvest_id, collection_id,
+                    self._send_warc_created_message(harvest_id, harvest_type,
+                                                    collection_id,
                                                     uuid.uuid4().hex,
                                                     dest_warc_filepath)
 
@@ -299,10 +301,11 @@ class BaseHarvester(BaseConsumer):
         status_routing_key = harvest_routing_key.replace("start", "status")
         self._publish_message(status_routing_key, message)
 
-    def _send_warc_created_message(self, harvest_id, collection_id, warc_id, warc_path):
+    def _send_warc_created_message(self, harvest_id, harvest_type, collection_id, warc_id, warc_path):
         message = {
             "harvest": {
-                "id": harvest_id
+                "id": harvest_id,
+                "type": harvest_type
             },
             "collection": {
                 "id": collection_id

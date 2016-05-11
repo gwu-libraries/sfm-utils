@@ -103,6 +103,7 @@ class TestBaseHarvester(tests.TestCase):
         # Setup
         message = {
             "id": "test:1",
+            "type": "test_type",
             "path": test_harvest_path,
             "collection": {
                 "id": "test_collection"
@@ -172,6 +173,7 @@ class TestBaseHarvester(tests.TestCase):
         self.assertEqual("warc_created", kwargs2["routing_key"])
         warc_created_message = kwargs2["body"]
         self.assertEqual(warc_created_message["harvest"]["id"], "test:1")
+        self.assertEqual(warc_created_message["harvest"]["type"], "test_type")
         self.assertEqual(warc_created_message["collection"]["id"], "test_collection")
         self.assertEqual(warc_created_message["warc"]["path"],
                          os.path.join(test_harvest_path,
@@ -229,6 +231,7 @@ class TestBaseHarvester(tests.TestCase):
         # Setup
         message = {
             "id": "test:1",
+            "type": "test_type",
             "path": test_harvest_path,
             "collection": {
                 "id": "test_collection"
@@ -289,6 +292,7 @@ class TestBaseHarvester(tests.TestCase):
         # Setup
         message = {
             "id": "test:1",
+            "type": "test_type",
             "path": test_harvest_path,
             "collection": {
                 "id": "test_collection"
@@ -393,6 +397,7 @@ class TestBaseHarvester(tests.TestCase):
         # Setup
         message = {
             "id": "test:1",
+            "type": "test_type",
             "path": test_harvest_path,
             "collection": {
                 "id": "test_collection"
