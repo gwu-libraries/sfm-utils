@@ -129,18 +129,29 @@ class BaseConsumer(ConsumerProducerMixin):
         """
         pass
 
-    def _publish_message(self, routing_key, message):
+    def _publish_message(self, routing_key, message, trunate_debug_length=None):
         message_body = json.dumps(message, indent=4)
         if self.mq_config:
-            log.debug("Sending message to %s with routing_key %s. The body is: %s", self.exchange.name, routing_key,
-                      json.dumps(message, indent=4))
+            if trunate_debug_length:
+                log.debug("Sending message to %s with routing_key %s. The first %s characters of the body is: %s",
+                          self.exchange.name, routing_key,
+                          trunate_debug_length, message_body[:trunate_debug_length])
+            else:
+                log.debug("Sending message to %s with routing_key %s. The body is: %s", self.exchange.name, routing_key,
+                          message_body)
             self.producer.publish(body=message,
                                   routing_key=routing_key,
                                   retry=True,
                                   exchange=self.exchange)
         else:
-            log.debug("Skipping sending message to sfm_exchange with routing_key %s. The body is: %s",
-                      routing_key, message_body)
+            if trunate_debug_length:
+                log.debug(
+                    "Skipping sending message to sfm_exchange with routing_key %s. The first %s characters of the body "
+                    "is: %s",
+                    routing_key, trunate_debug_length, message_body[:trunate_debug_length])
+            else:
+                log.debug("Skipping sending message to sfm_exchange with routing_key %s. The body is: %s",
+                          routing_key, message_body)
 
 
 class MqConfig:

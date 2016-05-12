@@ -60,30 +60,29 @@ class ExceptionRaisingHarvester(BaseHarvester):
 
 class TestableStreamHarvester(BaseHarvester):
     def __init__(self, state_store, warc_dir, connection=None, exchange=None):
-        BaseHarvester.__init__(self, process_interval_secs=3)
+        BaseHarvester.__init__(self, stream_restart_interval_secs=5)
         self.state_store = state_store
         self.warc_dir = warc_dir
         if connection:
             self.mq_config = True
             self._producer_connection = connection
         self.exchange = exchange
+        self.harvest_calls = 0
 
     def harvest_seeds(self):
-        self.harvest_result.infos.append(Msg("FAKE_CODE1", "This is my message."))
-        self.harvest_result.warnings.append(Msg("FAKE_CODE2", "This is my warning."))
-        self.harvest_result.errors.append(Msg("FAKE_CODE3", "This is my error."))
-        self.harvest_result.token_updates["131866249@N02"] = "j.littman"
-        self.harvest_result.uids["library_of_congress"] = "671366249@N03"
-        i = 0
+        self.harvest_calls += 1
+        fake_warc(self.warc_dir,
+                  "test_1-20151109195229879-{0:05d}-97528-GLSS-F0G5RP-8000.warc.gz".format(self.harvest_calls))
+        if self.harvest_calls == 1:
+            self.harvest_result.infos.append(Msg("FAKE_CODE1", "This is my message."))
+            self.harvest_result.warnings.append(Msg("FAKE_CODE2", "This is my warning."))
+            self.harvest_result.errors.append(Msg("FAKE_CODE3", "This is my error."))
+            self.harvest_result.token_updates["131866249@N02"] = "j.littman"
+            self.harvest_result.uids["library_of_congress"] = "671366249@N03"
+        for i in range(5):
+            self.harvest_result.urls.append("http://www.{}.edu".format(i))
+            self.harvest_result.increment_summary("stuff")
         while not self.stop_event.is_set():
-            i += 1
-            if i % 4 == 0:
-                fake_warc(self.warc_dir, "test_1-20151109195229879-{0:05d}-97528-GLSS-F0G5RP-8000.warc.gz".format(i))
-            # Lock before updating
-            with self.harvest_result_lock:
-                self.harvest_result.urls.append("http://www.{}.edu".format(i))
-                self.harvest_result.increment_summary("stuff")
-
             sleep(.5)
 
     def _create_state_store(self):
@@ -134,7 +133,7 @@ class TestBaseHarvester(tests.TestCase):
         mock_message.ack.assert_called_once_with()
         self.assertEqual(message, harvester.message)
         mock_tempfile.mkdtemp.assert_called_once_with(prefix="test_1")
-        mock_warced_class.assert_called_once_with("test_1", test_warc_path, debug=False)
+        mock_warced_class.assert_called_once_with("test_1", test_warc_path, debug=False, interrupt=False)
         self.assertTrue(mock_warced.__enter__.called)
         self.assertTrue(mock_warced.__exit__.called)
 
@@ -261,7 +260,7 @@ class TestBaseHarvester(tests.TestCase):
         mock_message.ack.assert_called_once_with()
         self.assertEqual(message, harvester.message)
         mock_tempfile.mkdtemp.assert_called_once_with(prefix="test_1")
-        mock_warced_class.assert_called_once_with("test_1", test_warc_path, debug=False)
+        mock_warced_class.assert_called_once_with("test_1", test_warc_path, debug=False, interrupt=False)
         self.assertTrue(mock_warced.__enter__.called)
         self.assertTrue(mock_warced.__exit__.called)
 
@@ -319,7 +318,7 @@ class TestBaseHarvester(tests.TestCase):
         # Test assertions
         self.assertEqual(message, harvester.message)
         mock_tempfile.mkdtemp.assert_called_once_with(prefix="test_1")
-        mock_warced_class.assert_called_once_with("test_1", test_warc_path, debug=False)
+        mock_warced_class.assert_called_once_with("test_1", test_warc_path, debug=False, interrupt=False)
         self.assertTrue(mock_warced.__enter__.called)
         self.assertTrue(mock_warced.__exit__.called)
 
@@ -426,16 +425,17 @@ class TestBaseHarvester(tests.TestCase):
         mock_tempfile.mkdtemp.return_value = test_warc_path
         mock_warced = MagicMock(spec=warced)
         # Return mock_twarc when instantiating a twarc.
-        mock_warced_class.side_effect = [mock_warced]
+        mock_warced_class.side_effect = [mock_warced, mock_warced]
 
         # Setup interrupt
         def stop_it(h):
+            h.terminate_event.set()
             h.stop_event.set()
 
         # Create harvester and invoke _callback
         harvester = TestableStreamHarvester(mock_state_store, test_warc_path, mock_connection, mock_exchange)
         # harvester._callback(message, mock_message)
-        t = threading.Timer(5, stop_it, args=[harvester])
+        t = threading.Timer(8, stop_it, args=[harvester])
         t.start()
         harvester.harvest_from_file(message_filepath, "harvest.start.test.test_usertimeline", is_streaming=True)
 
@@ -444,7 +444,8 @@ class TestBaseHarvester(tests.TestCase):
         # mock_message.ack.assert_called_once_with()
         self.assertEqual(message, harvester.message)
         mock_tempfile.mkdtemp.assert_called_once_with(prefix="test_1")
-        mock_warced_class.assert_called_once_with("test_1", test_warc_path, debug=False)
+        mock_warced_class.assert_called_with("test_1", test_warc_path, debug=False, interrupt=True)
+        self.assertEqual(2, mock_warced_class.call_count)
         self.assertTrue(mock_warced.__enter__.called)
         self.assertTrue(mock_warced.__exit__.called)
 
@@ -454,10 +455,10 @@ class TestBaseHarvester(tests.TestCase):
         # Warcs moved
         self.assertTrue(os.path.exists(
             os.path.join(test_harvest_path,
-                         "2015/11/09/19/test_1-20151109195229879-00004-97528-GLSS-F0G5RP-8000.warc.gz")))
+                         "2015/11/09/19/test_1-20151109195229879-00001-97528-GLSS-F0G5RP-8000.warc.gz")))
         self.assertTrue(os.path.exists(
             os.path.join(test_harvest_path,
-                         "2015/11/09/19/test_1-20151109195229879-00008-97528-GLSS-F0G5RP-8000.warc.gz")))
+                         "2015/11/09/19/test_1-20151109195229879-00002-97528-GLSS-F0G5RP-8000.warc.gz")))
         shutil.rmtree(test_harvest_path)
 
         # Web harvest
@@ -484,7 +485,7 @@ class TestBaseHarvester(tests.TestCase):
         self.assertEqual(warc_created_message["collection"]["id"], "test_collection")
         self.assertEqual(warc_created_message["warc"]["path"],
                          os.path.join(test_harvest_path,
-                                      "2015/11/09/19/test_1-20151109195229879-00004-97528-GLSS-F0G5RP-8000.warc.gz"))
+                                      "2015/11/09/19/test_1-20151109195229879-00001-97528-GLSS-F0G5RP-8000.warc.gz"))
         self.assertEqual(warc_created_message["warc"]["sha1"], "3d63d3c46d5dfac8495621c9c697e2089e5359b2")
         self.assertEqual(warc_created_message["warc"]["bytes"], 9)
         self.assertEqual(32, len(warc_created_message["warc"]["id"]))
@@ -540,7 +541,7 @@ class TestBaseHarvester(tests.TestCase):
         warc_created_message2 = kwargs5["body"]
         self.assertEqual(warc_created_message2["warc"]["path"],
                          os.path.join(test_harvest_path,
-                                      "2015/11/09/19/test_1-20151109195229879-00008-97528-GLSS-F0G5RP-8000.warc.gz"))
+                                      "2015/11/09/19/test_1-20151109195229879-00002-97528-GLSS-F0G5RP-8000.warc.gz"))
         self.assertEqual(32, len(warc_created_message2["warc"]["id"]))
 
         # Harvest completed message

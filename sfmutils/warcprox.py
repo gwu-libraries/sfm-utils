@@ -60,33 +60,22 @@ class warced():
     are set. This will properly configure the requests library to use the proxy;
     other configuration may be necessary for other HTTP libraries.
     """
-    def __init__(self, prefix, directory, rollover_time=900, rollover_idle_time=930, record_size=1000*1000*100,
-                 record_rollover_time=5*60, compress=True, port=None, debug=False):
+    def __init__(self, prefix, directory, compress=True, port=None, debug=False, interrupt=False):
         """
         :param prefix: prefix for the WARC filename.
         :param directory: directory into which to place the WARCS.
-        :param rollover_time: Number of seconds before starting a new WARC. Default
-        is 15 minutes.
-        :param rollover_idle_time: Number of seconds without activity before
-        starting a new WARC. Suggest rollover_time + 30.
-        :param record_size: Number of bytes before using record segmentation. Default
-        is 100mb.
-        :param record_rollover_time: Number of seconds before using new record segment. Default
-        is 5 minutes.
         :param compress: gzip compress the WARC. Default is true.
         :param port: Port on which to run the proxy. If not provided, an open
         port will be selected.
         :param debug: If True, runs warcprox with verbose option.
+        :param interrupt: If True, interrupts request when warcprox receives SIGTERM.
         """
         self.directory = directory
         self.prefix = prefix
         self.port = port or self._pick_a_port()
-        self.rollover_time = rollover_time
-        self.rollover_idle_time = rollover_idle_time
-        self.record_size = record_size
-        self.record_rollover_time = record_rollover_time
         self.compress = compress
         self.warcprox = None
+        self.interrupt = interrupt
         self.ca_dir = tempfile.mkdtemp()
         self.ca_bundle = os.path.join(self.ca_dir, "warcprox-ca.pem")
         self.debug = debug
@@ -133,16 +122,10 @@ class warced():
                                                                                                 self.port)
         if self.compress:
             cl += " -z"
-        if self.rollover_time:
-            cl += " --rollover-time {}".format(self.rollover_time)
-        if self.rollover_idle_time:
-            cl += " --rollover-idle-time {}".format(self.rollover_idle_time)
-        if self.record_size:
-            cl += " -r {}".format(self.record_size)
-        if self.record_rollover_time:
-            cl += " --record-rollover-time {}".format(self.record_rollover_time)
         if self.debug:
             cl += " -v"
+        if self.interrupt:
+            cl += " -i"
         return cl
 
     def __exit__(self, exc_type, exc_val, exc_tb):
