@@ -10,6 +10,7 @@ from kombu import Producer, Connection, Exchange
 from kombu.message import Message
 import tests
 import iso8601
+from datetime import date, timedelta
 from sfmutils.harvester import BaseHarvester
 from sfmutils.state_store import NullHarvestStateStore
 from sfmutils.harvester import Msg
@@ -38,8 +39,9 @@ class TestableHarvester(BaseHarvester):
         self.harvest_result.warnings.append(Msg("FAKE_CODE2", "This is my warning."))
         self.harvest_result.errors.append(Msg("FAKE_CODE3", "This is my error."))
         self.harvest_result.urls.extend(("http://www.gwu.edu", "http://library.gwu.edu"))
-        self.harvest_result.increment_summary("photo", increment=12)
-        self.harvest_result.increment_summary("user")
+        self.harvest_result.increment_stats("photo", count=5, day=date.today()-timedelta(days=1))
+        self.harvest_result.increment_stats("photo", count=12)
+        self.harvest_result.increment_stats("user")
         self.harvest_result.token_updates["131866249@N02"] = "j.littman"
         self.harvest_result.uids["library_of_congress"] = "671366249@N03"
 
@@ -81,7 +83,7 @@ class TestableStreamHarvester(BaseHarvester):
             self.harvest_result.uids["library_of_congress"] = "671366249@N03"
         for i in range(5):
             self.harvest_result.urls.append("http://www.{}.edu".format(i))
-            self.harvest_result.increment_summary("stuff")
+            self.harvest_result.increment_stats("stuff")
         while not self.stop_event.is_set():
             sleep(.5)
 
@@ -207,9 +209,14 @@ class TestBaseHarvester(tests.TestCase):
         self.assertIsNotNone(iso8601.parse_date(harvest_result_message["date_started"]))
         self.assertIsNotNone(iso8601.parse_date(harvest_result_message["date_ended"]))
         self.assertDictEqual({
-            "photo": 12,
-            "user": 1
-        }, harvest_result_message["summary"])
+            (date.today() - timedelta(days=1)).isoformat(): {
+                "photo": 5
+            },
+            date.today().isoformat(): {
+                "photo": 12,
+                "user": 1
+            }
+        }, harvest_result_message["stats"])
         self.assertDictEqual({
             "131866249@N02": "j.littman"
         }, harvest_result_message["token_updates"])
@@ -351,10 +358,6 @@ class TestBaseHarvester(tests.TestCase):
         }, harvester.harvest_result.errors[0].to_map())
         self.assertIsNotNone(harvester.harvest_result.started)
         self.assertIsNotNone(harvester.harvest_result.ended)
-        self.assertDictEqual({
-            "photo": 12,
-            "user": 1
-        }, harvester.harvest_result.summary)
         self.assertDictEqual({
             "131866249@N02": "j.littman"
         }, harvester.harvest_result.token_updates)
@@ -515,7 +518,7 @@ class TestBaseHarvester(tests.TestCase):
         }, harvest_running_message["errors"][0])
         self.assertIsNotNone(iso8601.parse_date(harvest_running_message["date_started"]))
         self.assertIsNone(harvest_running_message.get("date_ended"))
-        stuff_count = harvest_running_message["summary"]["stuff"]
+        stuff_count = harvest_running_message["stats"][date.today().isoformat()]["stuff"]
         self.assertTrue(stuff_count)
         self.assertDictEqual({
             "131866249@N02": "j.littman"
@@ -554,7 +557,7 @@ class TestBaseHarvester(tests.TestCase):
         self.assertFalse(len(harvest_completed_message["errors"]))
         self.assertIsNotNone(iso8601.parse_date(harvest_completed_message["date_started"]))
         self.assertIsNotNone(iso8601.parse_date(harvest_completed_message.get("date_ended")))
-        self.assertTrue(stuff_count < harvest_completed_message["summary"]["stuff"])
+        self.assertTrue(stuff_count < harvest_completed_message["stats"][date.today().isoformat()]["stuff"])
         self.assertFalse(len(harvest_completed_message["token_updates"]))
         self.assertFalse(len(harvest_completed_message["uids"]))
         self.assertEqual(2, harvest_completed_message["warcs"]["count"])

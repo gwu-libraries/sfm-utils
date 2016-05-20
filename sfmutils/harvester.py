@@ -9,11 +9,12 @@ import argparse
 import sys
 import threading
 import signal
-from collections import Counter
+from collections import Counter, OrderedDict
 import os
 import re
 import codecs
 import uuid
+from datetime import date
 from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
 from sfmutils.state_store import JsonHarvestStateStore
 from sfmutils.warcprox import warced
@@ -33,7 +34,8 @@ class HarvestResult(BaseResult):
         self.urls = []
         self.warcs = []
         self.warc_bytes = 0
-        self.summary = Counter()
+        # Map of days to counters (map of items to counts)
+        self._stats = OrderedDict()
         # Map of uids to tokens for which tokens have been found to have changed.
         self.token_updates = {}
         # Map of tokens to uids for tokens for which uids have been found.
@@ -50,8 +52,8 @@ class HarvestResult(BaseResult):
             harv_str += " Warc bytes: {}".format(self.warc_bytes)
         if self.urls:
             harv_str += " Urls: {}".format(self.urls)
-        if self.summary:
-            harv_str += " Harvest summary: {}".format(self.summary)
+        if self._stats:
+            harv_str += " Harvest stats: {}".format(self.stats_summary())
         if self.token_updates:
             harv_str += " Token updates: {}".format(self.token_updates)
         if self.uids:
@@ -61,8 +63,25 @@ class HarvestResult(BaseResult):
     def urls_as_set(self):
         return set(self.urls)
 
-    def increment_summary(self, key, increment=1):
-        self.summary[key] += increment
+    def increment_stats(self, item, count=1, day=date.today()):
+        if day not in self._stats:
+            self._stats[day] = Counter()
+        self._stats[day][item] += count
+
+    def stats(self):
+        """
+        Returns ordered dictinary of day to stats.
+        """
+        return self._stats
+
+    def stats_summary(self):
+        """
+        Returns counter that aggregates the stats.
+        """
+        summary = Counter()
+        for stats in self._stats.values():
+            summary.update(stats)
+        return summary
 
     def add_warc(self, filepath):
         self.warcs.append(filepath)
@@ -254,7 +273,7 @@ class BaseHarvester(BaseConsumer):
     @staticmethod
     def _list_warcs(path):
         warcs = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and
-                (f.endswith(".warc") or f.endswith(".warc.gz"))]
+                 (f.endswith(".warc") or f.endswith(".warc.gz"))]
         if len(warcs) == 0:
             log.warning("No warcs found in %s", path)
         return warcs
@@ -300,7 +319,7 @@ class BaseHarvester(BaseConsumer):
             "warnings": [msg.to_map() for msg in harvest_result.warnings],
             "errors": [msg.to_map() for msg in harvest_result.errors],
             "date_started": harvest_result.started.isoformat(),
-            "summary": dict(harvest_result.summary),
+            "stats": dict(),
             "token_updates": harvest_result.token_updates,
             "uids": harvest_result.uids,
             "warcs": {
@@ -308,6 +327,9 @@ class BaseHarvester(BaseConsumer):
                 "bytes": harvest_result.warc_bytes
             }
         }
+
+        for day, stats in harvest_result.stats().items():
+            message["stats"][day.isoformat()] = dict(stats)
 
         if harvest_result.ended:
             message["date_ended"] = harvest_result.ended.isoformat()
