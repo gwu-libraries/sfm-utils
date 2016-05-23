@@ -63,7 +63,9 @@ class HarvestResult(BaseResult):
     def urls_as_set(self):
         return set(self.urls)
 
-    def increment_stats(self, item, count=1, day=date.today()):
+    def increment_stats(self, item, count=1, day=None):
+        if day is None:
+            day = date.today()
         if day not in self._stats:
             self._stats[day] = Counter()
         self._stats[day][item] += count
