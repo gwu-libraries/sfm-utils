@@ -43,7 +43,7 @@ class WarcedTest(TestCase):
         warc_dir = tempfile.mkdtemp()
         try:
             with warced("test", warc_dir) as w:
-                resp = requests.get("https://www.gwu.edu")
+                resp = requests.get("http://www.gwu.edu")
                 self.assertEqual(200, resp.status_code)
             files = os.listdir(warc_dir)
             self.assertEqual(1, len(files))

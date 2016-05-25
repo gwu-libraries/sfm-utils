@@ -41,3 +41,17 @@ class TestApiClient(TestCase):
         self.assertEqual(0, len(list(self.client.warcs(harvest_date_end="2015-02-22T14:49:07Z"))))
         self.assertEqual(2, len(list(self.client.warcs(harvest_date_end="2016-02-22T14:49:07Z"))))
         self.assertEqual(3, len(list(self.client.warcs(harvest_date_end="2017-02-22T14:48:07Z"))))
+
+    @vcr.use_cassette()
+    def test_exclude_web(self):
+        self.assertEqual(4, len(list(self.client.warcs(exclude_web=True))))
+        self.assertEqual(5, len(list(self.client.warcs(exclude_web=False))))
+
+    @vcr.use_cassette()
+    def test_all_seedsets(self):
+        self.assertEqual(5, len(list(self.client.seedsets())))
+
+    @vcr.use_cassette()
+    def test_seedsets_startswith(self):
+        self.assertEqual(1, len(list(self.client.seedsets(seedset_id_startswith="8fcb71eb883745"))))
+        self.assertEqual(0, len(list(self.client.seedsets(seedset_id_startswith="x8fcb71eb883745"))))
