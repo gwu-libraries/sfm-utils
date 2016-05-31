@@ -55,17 +55,17 @@ class BaseExporter(BaseConsumer):
         self.export_result.started = datetime.datetime.now()
 
         # Get the WARCs from the API
-        seedset_id = self.message.get("seedset", {}).get("id")
+        collection_id = self.message.get("collection", {}).get("id")
         seed_ids = []
         seed_uids = []
         for seed in self.message.get("seeds", []):
             seed_ids.append(seed["id"])
             seed_uids.append(seed["uid"])
 
-        if (seedset_id or seed_ids) and not (seedset_id and seed_ids):
+        if (collection_id or seed_ids) and not (collection_id and seed_ids):
             harvest_date_start = self.message.get("harvest_date_start")
             harvest_date_end = self.message.get("harvest_date_end")
-            warc_paths = self._get_warc_paths(seedset_id, seed_ids, harvest_date_start, harvest_date_end)
+            warc_paths = self._get_warc_paths(collection_id, seed_ids, harvest_date_start, harvest_date_end)
             export_format = self.message["format"]
             export_path = self.message["path"]
             base_filepath = os.path.join(export_path, export_id)
@@ -114,7 +114,7 @@ class BaseExporter(BaseConsumer):
                 self.export_result.success = False
 
         else:
-            self.export_result.errors.append(Msg(CODE_BAD_REQUEST, "Request export of a seed or seed set."))
+            self.export_result.errors.append(Msg(CODE_BAD_REQUEST, "Request export of a seed or collection."))
             self.export_result.success = False
 
         self.export_result.ended = datetime.datetime.now()
@@ -128,13 +128,13 @@ class BaseExporter(BaseConsumer):
                 json.dump(photo, f)
                 f.write("\n")
 
-    def _get_warc_paths(self, seedset_id, seed_ids, harvest_date_start, harvest_date_end):
+    def _get_warc_paths(self, collection_id, seed_ids, harvest_date_start, harvest_date_end):
         """
         Get list of WARC files and make sure they exists.
         """
         warc_paths = []
-        log.debug("Getting warcs for seedset %s", seedset_id)
-        for warc in self.api_client.warcs(seedset_id=seedset_id, seed_ids=seed_ids,
+        log.debug("Getting warcs for collection %s", collection_id)
+        for warc in self.api_client.warcs(collection_id=collection_id, seed_ids=seed_ids,
                                           harvest_date_start=harvest_date_start, harvest_date_end=harvest_date_end,
                                           exclude_web=True):
             warc_path = os.path.join(self.warc_base_path, warc["path"]) if self.warc_base_path else warc["path"]

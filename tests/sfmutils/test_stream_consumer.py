@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 from unittest import TestCase
 from mock import MagicMock, patch
-import json
 import socket
 from sfmutils.consumer import MqConfig
 from sfmutils.stream_consumer import StreamConsumer
@@ -33,8 +32,8 @@ class TestStreamConsumer(TestCase):
     def test_start(self):
         message = {
             "id": "test:1",
-            "collection": {
-                "id": "test_collection"
+            "collection_set": {
+                "id": "test_collection_set"
             }
         }
 

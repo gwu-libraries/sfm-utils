@@ -17,9 +17,9 @@ class TestApiClient(TestCase):
         self.assertEqual(3, len(list(self.client.warcs())))
 
     @vcr.use_cassette()
-    def test_warcs_by_seedset(self):
-        self.assertEqual(2, len(list(self.client.warcs(seedset_id="005b131f5f854402afa2b08a4b7ba960"))))
-        self.assertEqual(0, len(list(self.client.warcs(seedset_id="x005b131f5f854402afa2b08a4b7ba960"))))
+    def test_warcs_by_collection(self):
+        self.assertEqual(2, len(list(self.client.warcs(collection_id="005b131f5f854402afa2b08a4b7ba960"))))
+        self.assertEqual(0, len(list(self.client.warcs(collection_id="x005b131f5f854402afa2b08a4b7ba960"))))
 
     @vcr.use_cassette()
     def test_warcs_by_seed(self):
@@ -48,10 +48,10 @@ class TestApiClient(TestCase):
         self.assertEqual(5, len(list(self.client.warcs(exclude_web=False))))
 
     @vcr.use_cassette()
-    def test_all_seedsets(self):
-        self.assertEqual(5, len(list(self.client.seedsets())))
+    def test_all_collections(self):
+        self.assertEqual(5, len(list(self.client.collections())))
 
     @vcr.use_cassette()
-    def test_seedsets_startswith(self):
-        self.assertEqual(1, len(list(self.client.seedsets(seedset_id_startswith="8fcb71eb883745"))))
-        self.assertEqual(0, len(list(self.client.seedsets(seedset_id_startswith="x8fcb71eb883745"))))
+    def test_collections_startswith(self):
+        self.assertEqual(1, len(list(self.client.collections(collection_id_startswith="8fcb71eb883745"))))
+        self.assertEqual(0, len(list(self.client.collections(collection_id_startswith="x8fcb71eb883745"))))

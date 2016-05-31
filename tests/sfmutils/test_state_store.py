@@ -9,12 +9,12 @@ from unittest import TestCase
 class TestJsonHarvestStateStore(TestCase):
 
     def setUp(self):
-        self.collection_path = os.path.join(tempfile.mkdtemp(), "test")
-        self.store = JsonHarvestStateStore(self.collection_path)
+        self.path = os.path.join(tempfile.mkdtemp(), "test")
+        self.store = JsonHarvestStateStore(self.path)
 
     def tearDown(self):
-        if os.path.exists(self.collection_path):
-            shutil.rmtree(self.collection_path)
+        if os.path.exists(self.path):
+            shutil.rmtree(self.path)
 
     def test_set_state(self):
         self.assertIsNone(self.store.get_state("resource_type1", "key1"), "Has state before state is set")
@@ -36,5 +36,5 @@ class TestJsonHarvestStateStore(TestCase):
         self.assertEqual("value1", self.store.get_state("resource_type1", "key1"), "Retrieved state not value1")
 
         # Create a new store and test for value
-        self.store = JsonHarvestStateStore(self.collection_path)
+        self.store = JsonHarvestStateStore(self.path)
         self.assertEqual("value1", self.store.get_state("resource_type1", "key1"), "Retrieved state not value1")
