@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 import __builtin__
 import warc as ia_warc
-from warc.utils import FilePart as ia_FilePart
 from urllib3 import HTTPResponse
 from urllib3._collections import HTTPHeaderDict
 import gzip
@@ -31,7 +30,7 @@ class WARCResponseReader:
             # Only handle responses.
             if record.type == "response":
                 payload = PayloadFilePart(record.payload.fileobj, record.payload.length)
-                save_payload = self._save_current_payload()
+                self._warc_reader.current_payload = payload
 
                 # Read http start line and headers
                 start_line, http_headers = self.read_http_start_line_and_headers(payload)
@@ -40,20 +39,6 @@ class WARCResponseReader:
                     http_response = HTTPResponse(body=payload, headers=http_headers, status=200, version=1.1,
                                                  reason="OK", preload_content=False)
                     yield WARCResponseRecord(record.header, http_response)
-                    # Setting this so _warc_reader can read to end of record.
-                    self._restore_current_payload(save_payload)
-
-    def _save_current_payload(self):
-        save_payload = ia_FilePart(self._warc_reader.current_payload.fileobj,
-                                   self._warc_reader.current_payload.length)
-        save_payload.buf = self._warc_reader.current_payload.buf
-        save_payload.offset = self._warc_reader.current_payload.offset
-        save_payload.fileobj_position = self._warc_reader.current_payload.fileobj.tell()
-        return save_payload
-
-    def _restore_current_payload(self, save_payload):
-        self._warc_reader.current_payload = save_payload
-        self._warc_reader.current_payload.fileobj.seek(save_payload.fileobj_position)
 
     @staticmethod
     def read_http_start_line_and_headers(payload):
