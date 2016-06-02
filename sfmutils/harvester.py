@@ -188,7 +188,7 @@ class BaseHarvester(BaseConsumer):
 
     def _process(self, done=True):
         harvest_id = self.message["id"]
-        collection_id = self. message["collection"]["id"]
+        collection_set_id = self. message["collection_set"]["id"]
         harvest_path = self.message["path"]
         harvest_type = self.message["type"]
 
@@ -196,7 +196,7 @@ class BaseHarvester(BaseConsumer):
             # Send web harvest message
             urls_set = self.harvest_result.urls_as_set()
             if urls_set:
-                self._send_web_harvest_message(harvest_id, collection_id,
+                self._send_web_harvest_message(harvest_id, collection_set_id,
                                                harvest_path, urls_set)
             else:
                 log.debug("No urls, so not sending a web harvest message.")
@@ -214,7 +214,7 @@ class BaseHarvester(BaseConsumer):
                 self.harvest_result.add_warc(dest_warc_filepath)
                 # Send warc created message
                 self._send_warc_created_message(harvest_id, harvest_type,
-                                                collection_id,
+                                                collection_set_id,
                                                 uuid.uuid4().hex,
                                                 dest_warc_filepath)
 
@@ -296,15 +296,15 @@ class BaseHarvester(BaseConsumer):
         shutil.move(src_filepath, dest_filepath)
         return dest_filepath
 
-    def _send_web_harvest_message(self, harvest_id, collection_id, harvest_path, urls):
+    def _send_web_harvest_message(self, harvest_id, collection_set_id, harvest_path, urls):
         message = {
             "id": uuid.uuid4().hex,
             "parent_id": harvest_id,
             "path": harvest_path,
             "type": "web",
             "seeds": [],
-            "collection": {
-                "id": collection_id
+            "collection_set": {
+                "id": collection_set_id
             }
         }
         for url in urls:
@@ -340,14 +340,14 @@ class BaseHarvester(BaseConsumer):
         status_routing_key = harvest_routing_key.replace("start", "status")
         self._publish_message(status_routing_key, message)
 
-    def _send_warc_created_message(self, harvest_id, harvest_type, collection_id, warc_id, warc_path):
+    def _send_warc_created_message(self, harvest_id, harvest_type, collection_set_id, warc_id, warc_path):
         message = {
             "harvest": {
                 "id": harvest_id,
                 "type": harvest_type
             },
-            "collection": {
-                "id": collection_id
+            "collection_set": {
+                "id": collection_set_id
             },
             "warc": {
                 "id": warc_id,

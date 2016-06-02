@@ -106,8 +106,8 @@ class TestBaseHarvester(tests.TestCase):
             "id": "test:1",
             "type": "test_type",
             "path": test_harvest_path,
-            "collection": {
-                "id": "test_collection"
+            "collection_set": {
+                "id": "test_collection_set"
             }
         }
         mock_connection = MagicMock(spec=Connection)
@@ -165,7 +165,7 @@ class TestBaseHarvester(tests.TestCase):
                 "token": "http://library.gwu.edu"
             }
         ], web_harvest_message["seeds"])
-        self.assertEqual("test_collection", web_harvest_message["collection"]["id"])
+        self.assertEqual("test_collection_set", web_harvest_message["collection_set"]["id"])
         self.assertEqual(test_harvest_path, web_harvest_message["path"])
 
         # Warc created message
@@ -175,7 +175,7 @@ class TestBaseHarvester(tests.TestCase):
         warc_created_message = kwargs2["body"]
         self.assertEqual(warc_created_message["harvest"]["id"], "test:1")
         self.assertEqual(warc_created_message["harvest"]["type"], "test_type")
-        self.assertEqual(warc_created_message["collection"]["id"], "test_collection")
+        self.assertEqual(warc_created_message["collection_set"]["id"], "test_collection_set")
         self.assertEqual(warc_created_message["warc"]["path"],
                          os.path.join(test_harvest_path,
                                       "2015/11/09/19/test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000.warc.gz"))
@@ -239,8 +239,8 @@ class TestBaseHarvester(tests.TestCase):
             "id": "test:1",
             "type": "test_type",
             "path": test_harvest_path,
-            "collection": {
-                "id": "test_collection"
+            "collection_set": {
+                "id": "test_collection_set"
             }
         }
 
@@ -300,8 +300,8 @@ class TestBaseHarvester(tests.TestCase):
             "id": "test:1",
             "type": "test_type",
             "path": test_harvest_path,
-            "collection": {
-                "id": "test_collection"
+            "collection_set": {
+                "id": "test_collection_set"
             }
         }
 
@@ -401,8 +401,8 @@ class TestBaseHarvester(tests.TestCase):
             "id": "test:1",
             "type": "test_type",
             "path": test_harvest_path,
-            "collection": {
-                "id": "test_collection"
+            "collection_set": {
+                "id": "test_collection_set"
             }
         }
 
@@ -474,7 +474,7 @@ class TestBaseHarvester(tests.TestCase):
         self.assertEqual(32, len(web_harvest_id1))
         self.assertEqual("test:1", web_harvest_message1["parent_id"])
         self.assertEqual("web", web_harvest_message1["type"])
-        self.assertEqual("test_collection", web_harvest_message1["collection"]["id"])
+        self.assertEqual("test_collection_set", web_harvest_message1["collection_set"]["id"])
         self.assertEqual(test_harvest_path, web_harvest_message1["path"])
         # Contains some token
         self.assertTrue(len(web_harvest_message1["seeds"]))
@@ -485,7 +485,7 @@ class TestBaseHarvester(tests.TestCase):
         self.assertEqual("publish", name2)
         self.assertEqual("warc_created", kwargs2["routing_key"])
         warc_created_message = kwargs2["body"]
-        self.assertEqual(warc_created_message["collection"]["id"], "test_collection")
+        self.assertEqual(warc_created_message["collection_set"]["id"], "test_collection_set")
         self.assertEqual(warc_created_message["warc"]["path"],
                          os.path.join(test_harvest_path,
                                       "2015/11/09/19/test_1-20151109195229879-00001-97528-GLSS-F0G5RP-8000.warc.gz"))

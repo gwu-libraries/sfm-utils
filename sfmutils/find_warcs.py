@@ -21,8 +21,8 @@ def main(sys_argv):
                         default=default_api_base_url)
     parser.add_argument("--debug", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
                         default="False", const="True")
-    parser.add_argument("seedset", nargs="+", help="Limit to WARCs of this seedset. "
-                                                   "Truncated seedset ids may be used.")
+    parser.add_argument("collection", nargs="+", help="Limit to WARCs of this collection. "
+                                                      "Truncated collection ids may be used.")
 
     # Explicitly using sys.argv so that can mock out for testing.
     args = parser.parse_args(sys_argv[1:])
@@ -33,27 +33,27 @@ def main(sys_argv):
     logging.getLogger("requests").setLevel(logging.DEBUG if args.debug else logging.INFO)
 
     api_client = ApiClient(args.api_base_url)
-    seedset_ids = []
-    for seedset_id_part in args.seedset:
-        log.debug("Looking up seedset id part %s", seedset_id_part)
-        if len(seedset_id_part) == 32:
-            seedset_ids.append(seedset_id_part)
+    collection_ids = []
+    for collection_id_part in args.collection:
+        log.debug("Looking up collection id part %s", collection_id_part)
+        if len(collection_id_part) == 32:
+            collection_ids.append(collection_id_part)
         else:
-            seedsets = list(api_client.seedsets(seedset_id_startswith=seedset_id_part))
-            if len(seedsets) == 0:
-                print "No matching seedsets for {}".format(seedset_id_part)
+            collections = list(api_client.collections(collection_id_startswith=collection_id_part))
+            if len(collections) == 0:
+                print "No matching collections for {}".format(collection_id_part)
                 sys.exit(1)
                 return
-            elif len(seedsets) > 1:
-                print "Multuple matching seedsets for {}".format(seedset_id_part)
+            elif len(collections) > 1:
+                print "Multuple matching collections for {}".format(collection_id_part)
                 sys.exit(1)
                 return
             else:
-                seedset_ids.append(seedsets[0]["seedset_id"])
+                collection_ids.append(collections[0]["collection_id"])
     warc_filepaths = set()
-    for seedset_id in seedset_ids:
-        log.debug("Looking up warcs for %s", seedset_id)
-        warcs = api_client.warcs(seedset_id=seedset_id, harvest_date_start=args.harvest_start,
+    for collection_id in collection_ids:
+        log.debug("Looking up warcs for %s", collection_id)
+        warcs = api_client.warcs(collection_id=collection_id, harvest_date_start=args.harvest_start,
                                  harvest_date_end=args.harvest_end, exclude_web=not args.include_web)
         for warc in warcs:
             warc_filepaths.add(warc["path"])

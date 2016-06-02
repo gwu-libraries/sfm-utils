@@ -35,7 +35,7 @@ class TestExporter(tests.TestCase):
     @patch("sfmutils.exporter.ApiClient", autospec=True)
     # Mock out Producer
     @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_export_seedset(self, mock_producer_cls, mock_api_client_cls):
+    def test_export_collection(self, mock_producer_cls, mock_api_client_cls):
         mock_warc_iter_cls = MagicMock()
         mock_table_cls = MagicMock()
         mock_table = MagicMock(spec=BaseTable)
@@ -62,7 +62,7 @@ class TestExporter(tests.TestCase):
         export_message = {
             "id": "test1",
             "type": "test_user",
-            "seedset": {
+            "collection": {
                 "id": "005b131f5f854402afa2b08a4b7ba960"
             },
             "format": "csv",
@@ -85,7 +85,7 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(exclude_web=True, seedset_id="005b131f5f854402afa2b08a4b7ba960",
+        mock_api_client.warcs.assert_called_once_with(exclude_web=True, collection_id="005b131f5f854402afa2b08a4b7ba960",
                                                       seed_ids=[], harvest_date_start=harvest_date_start,
                                                       harvest_date_end=harvest_date_end)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, True, item_datetime_start, item_datetime_end, [])
@@ -130,7 +130,7 @@ class TestExporter(tests.TestCase):
         export_message = {
             "id": "test1",
             "type": "test_user",
-            "seedset": {
+            "collection": {
                 "id": "005b131f5f854402afa2b08a4b7ba960"
             },
             "format": "dehydrate",
@@ -148,7 +148,7 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(exclude_web=True, seedset_id="005b131f5f854402afa2b08a4b7ba960",
+        mock_api_client.warcs.assert_called_once_with(exclude_web=True, collection_id="005b131f5f854402afa2b08a4b7ba960",
                                                       seed_ids=[], harvest_date_end=None, harvest_date_start=None)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, [])
 
@@ -203,7 +203,7 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(exclude_web=True, seedset_id=None,
+        mock_api_client.warcs.assert_called_once_with(exclude_web=True, collection_id=None,
                                                       seed_ids=["005b131f5f854402afa2b08a4b7ba960",
                                                                 "105b131f5f854402afa2b08a4b7ba960"],
                                                       harvest_date_start=None, harvest_date_end=None)
@@ -217,14 +217,14 @@ class TestExporter(tests.TestCase):
         self.assertEqual(3, len(lines))
 
     @patch("sfmutils.exporter.ApiClient", autospec=True)
-    def test_export_seedset_missing_warc(self, mock_api_client_cls):
+    def test_export_collection_missing_warc(self, mock_api_client_cls):
         mock_api_client = MagicMock(spec=ApiClient)
         mock_api_client_cls.side_effect = [mock_api_client]
 
         export_message = {
             "id": "test3",
             "type": "test_user",
-            "seedset": {
+            "collection": {
                 "id": "005b131f5f854402afa2b08a4b7ba960"
             },
             "seeds": [
@@ -251,7 +251,7 @@ class TestExporter(tests.TestCase):
     @patch("sfmutils.exporter.ApiClient", autospec=True)
     # Mock out Producer
     @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_export_seedset_and_seeds(self, mock_producer_cls, mock_api_client_cls):
+    def test_export_collection_and_seeds(self, mock_producer_cls, mock_api_client_cls):
         mock_api_client = MagicMock(spec=ApiClient)
         mock_api_client_cls.side_effect = [mock_api_client]
         warcs = [{"warc_id": "9dc0b9c3a93a49eb8f713330b43f954c",
@@ -269,7 +269,7 @@ class TestExporter(tests.TestCase):
         export_message = {
             "id": "test2",
             "type": "test_user",
-            "seedset": {
+            "collection": {
                 "id": "005b131f5f854402afa2b08a4b7ba960"
             },
             "format": "csv",
@@ -286,7 +286,7 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(exclude_web=True, seedset_id="005b131f5f854402afa2b08a4b7ba960",
+        mock_api_client.warcs.assert_called_once_with(exclude_web=True, collection_id="005b131f5f854402afa2b08a4b7ba960",
                                                       seed_ids=[], harvest_date_end=None, harvest_date_start=None)
 
         self.assertFalse(exporter.export_result.success)
@@ -337,7 +337,7 @@ class TestableTable(BaseTable):
 
 class TestBaseTable(tests.TestCase):
     def setUp(self):
-        self.warc_paths = ("/collection1/warc1.warc.gz", "/collection1/warc2.warc.gz")
+        self.warc_paths = ("/collection_set1/warc1.warc.gz", "/collection_set1/warc2.warc.gz")
 
     def test_table(self):
 

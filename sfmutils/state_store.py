@@ -63,14 +63,14 @@ class JsonHarvestStateStore(DictHarvestStateStore):
     """
     A harvest state store implementation backed by a dictionary and stored as JSON.
 
-    The JSON is written to <collection_path>/state.json. It is loaded and saved on
+    The JSON is written to <path>/state.json. It is loaded and saved on
     every get and set.
     """
-    def __init__(self, collection_path):
+    def __init__(self, path):
         DictHarvestStateStore.__init__(self)
 
-        self.collection_path = collection_path
-        self.state_filepath = os.path.join(collection_path, "state.json")
+        self.path = path
+        self.state_filepath = os.path.join(path, "state.json")
 
     def _load_state(self):
         if os.path.exists(self.state_filepath):
@@ -84,8 +84,8 @@ class JsonHarvestStateStore(DictHarvestStateStore):
     def set_state(self, resource_type, key, value):
         self._load_state()
         DictHarvestStateStore.set_state(self, resource_type, key, value)
-        if not os.path.exists(self.collection_path):
-            os.makedirs(self.collection_path)
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
         with codecs.open(self.state_filepath, 'w') as state_file:
             json.dump(self._state, state_file)
 

@@ -16,8 +16,8 @@ class TestHarvestSupervisor(TestCase):
     def test_supervisor_start_and_stop(self, mock_server_proxy_class):
         message = {
             "id": "test:1",
-            "collection": {
-                "id": "test_collection",
+            "collection_set": {
+                "id": "test_collection_set",
             }
         }
 
