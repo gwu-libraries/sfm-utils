@@ -4,6 +4,7 @@ import json
 import argparse
 import logging
 import sys
+import os
 from urllib3.exceptions import ProtocolError
 
 log = logging.getLogger(__name__)
@@ -28,23 +29,30 @@ class BaseWarcIter:
     def __iter__(self):
         return self.iter()
 
-    def _should_debug(self, count):
-        if count <= 100 and count % 10 == 0:
-            return True
-        elif 100 < count and count % 100 == 0:
-            return True
-        return False
+    @staticmethod
+    def _debug_counts(filename, record_count, yield_count, by_record_count=True):
+        should_debug = False
+        if by_record_count and record_count <= 100 and record_count % 10 == 0:
+            should_debug = True
+        elif by_record_count and 100 < record_count and record_count % 100 == 0:
+            should_debug = True
+        elif not by_record_count and yield_count <= 1000 and yield_count % 100 == 0:
+            should_debug = True
+        elif not by_record_count and 1000 < yield_count and yield_count % 1000 == 0:
+            should_debug = True
+        if should_debug:
+            log.debug("File %s. Processed %s records. Yielded %s items.", filename, record_count, yield_count)
 
     def iter(self, limit_item_types=None, dedupe=False, item_date_start=None, item_date_end=None):
         seen_ids = {}
         for filepath in self.filepaths:
             log.info("Iterating over %s", filepath)
+            filename = os.path.basename(filepath)
             f = warc.WARCResponseFile(filepath)
             yield_count = 0
             for record_count, record in enumerate(f):
-                if self._should_debug(record_count):
-                    log.debug("Processed %s records. Yielded %s items.", record_count, yield_count)
-
+                self._debug_counts(filename, record_count, yield_count, by_record_count=True)
+  
                 if self._select_record(record.url):
                     # An iterator over json objects which constitute the payload of a record.
                     if not self.line_oriented:
@@ -87,6 +95,7 @@ class BaseWarcIter:
                                 if yield_item:
                                     if item is not None:
                                         yield_count += 1
+                                        self._debug_counts(filename, record_count, yield_count, by_record_count=False)
                                         yield item_type, item_id, item_date, item
                                     else:
                                         log.warn("Bad response in record %s", record.header.record_id)
