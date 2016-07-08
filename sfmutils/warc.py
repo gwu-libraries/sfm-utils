@@ -77,55 +77,42 @@ class PayloadFilePart:
     File interface for WARC record payloads.
     """
     def __init__(self, fileobj, length):
-        self.offset = 0
+        # self.offset = 0
 
         self.fileobj = fileobj
         self.start_position = fileobj.tell()
         self.length = length
         self.end_offset = length - 1
 
+    @property
+    def offset(self):
+        return self.fileobj.offset - self.start_position
+
     def read(self, size=-1):
         if size == -1:
             size = self.length
-        ending_offset = min(self.offset + size, self.length)
-        buf = ""
-        while self.offset != ending_offset:
-            file_section_offset = self.offset + self.start_position
-            remaining_size = self.length - file_section_offset + self.start_position
-            read_size = min(size - len(buf), remaining_size)
-            self.fileobj.seek(file_section_offset)
-            buf += self.fileobj.read(read_size)
-            self.offset += read_size
-            assert self.offset <= ending_offset
-        return buf
+        remaining_size = self.length - self.offset
+        read_size = min(size, remaining_size)
+        return self.fileobj.read(read_size)
 
     def tell(self):
         return self.offset
 
     def seek(self, offset, whence=0):
-        if whence == 0:
-            # Seek from start
-            self.offset = offset
-        elif whence == 1:
+        # Default is to seek from start
+        new_offset = 0
+        if whence == 1:
             # Relative to current
-            self.offset += offset
+            new_offset = self.offset + offset
         elif whence == 2:
             # Relative to end
-            self.offset = self.length - offset
+            new_offset = self.length - offset
+        self.fileobj.seek(new_offset + self.start_position)
 
     def readline(self):
-        chunks = []
-        chunk = self.read(1024)
-        while chunk and "\n" not in chunk:
-            chunks.append(chunk)
-            chunk = self.read(1024)
-        if "\n" in chunk:
-            chunk_len = len(chunk)
-            index = chunk.index("\n")
-            chunk = chunk[:index+1]
-            self.seek((chunk_len-index-1) * -1, 1)
-        chunks.append(chunk)
-        return "".join(chunks)
+        if self.offset < self.end_offset:
+            return self.fileobj.readline()
+        return ""
 
     def __iter__(self):
         line = self.readline()
@@ -145,4 +132,4 @@ class PayloadFilePart:
         return self.read(size)
 
     def close(self):
-        self.offset = self.length
+        pass
