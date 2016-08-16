@@ -2,6 +2,7 @@ import logging
 import codecs
 import os
 import json
+import shutil
 
 log = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ class JsonHarvestStateStore(DictHarvestStateStore):
 
         self.path = path
         self.state_filepath = os.path.join(path, "state.json")
+        self.state_tmp_filepath = os.path.join(path, "state.json.tmp")
 
     def _load_state(self):
         if os.path.exists(self.state_filepath):
@@ -86,8 +88,10 @@ class JsonHarvestStateStore(DictHarvestStateStore):
         DictHarvestStateStore.set_state(self, resource_type, key, value)
         if not os.path.exists(self.path):
             os.makedirs(self.path)
-        with codecs.open(self.state_filepath, 'w') as state_file:
+        # This way if the write fails, the original file will still be in place.
+        with codecs.open(self.state_tmp_filepath, 'w', encoding="utf-8") as state_file:
             json.dump(self._state, state_file)
+        shutil.move(self.state_tmp_filepath, self.state_filepath)
 
 
 class NullHarvestStateStore():
