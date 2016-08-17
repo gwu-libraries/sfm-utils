@@ -95,6 +95,8 @@ CODE_UNKNOWN_ERROR = "unknown_error"
 CODE_TOKEN_NOT_FOUND = "token_not_found"
 # UID not recognized by API.
 CODE_UID_NOT_FOUND = "uid_not_found"
+# Token is unauthorized/private.
+CODE_TOKEN_UNAUTHORIZED = "token_unauthorized"
 
 
 class BaseHarvester(BaseConsumer):
