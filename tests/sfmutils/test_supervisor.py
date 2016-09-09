@@ -12,6 +12,13 @@ from sfmutils.supervisor import HarvestSupervisor
 
 class TestHarvestSupervisor(TestCase):
 
+    def setUp(self):
+        self.working_path = tempfile.mkdtemp()
+
+    def tearDown(self):
+        if os.path.exists(self.working_path):
+            shutil.rmtree(self.working_path)
+
     @patch("sfmutils.supervisor.xmlrpclib.ServerProxy", autospec=True)
     def test_supervisor_start_and_stop(self, mock_server_proxy_class):
         message = {
@@ -43,7 +50,7 @@ class TestHarvestSupervisor(TestCase):
                                                mock_server_proxy4]
 
         supervisor = HarvestSupervisor("/opt/sfm/test_harvester.py", "test_host", "test_user", "test_password",
-                                       conf_path=conf_path, log_path=log_path, debug=True)
+                                       self.working_path, conf_path=conf_path, log_path=log_path, debug=True)
 
         # Conf_path is empty
         self.assertFalse(os.listdir(conf_path))
@@ -60,13 +67,14 @@ class TestHarvestSupervisor(TestCase):
         with open(os.path.join(conf_path, "test_1.conf")) as f:
             conf = f.read()
         self.assertEqual("""[program:test_1]
-command=python /opt/sfm/test_harvester.py --debug=True seed {conf_path}/test_1.json --streaming --host test_host --username test_user --password test_password --routing-key harvest.start.test.test_search
+command=python /opt/sfm/test_harvester.py --debug=True seed {conf_path}/test_1.json {working_path} --streaming --host test_host --username test_user --password test_password --routing-key harvest.start.test.test_search
 user={user}
 autostart=true
 autorestart=true
+stopwaitsecs=900
 stderr_logfile={log_path}/test_1.err.log
 stdout_logfile={log_path}/test_1.out.log
-""".format(conf_path=conf_path, log_path=log_path, user=getpass.getuser()), conf)
+""".format(conf_path=conf_path, log_path=log_path, user=getpass.getuser(), working_path=self.working_path), conf)
 
         # Remove process called
         mock_supervisor1.stopProcess.assert_called_once_with("test_1", True)

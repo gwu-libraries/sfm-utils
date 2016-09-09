@@ -17,20 +17,23 @@ class TestExporter(tests.TestCase):
         self.warcs = [{"warc_id": "9dc0b9c3a93a49eb8f713330b43f954c",
                        "path": "test_1-20151202200525007-00000-30033-GLSS-F0G5RP-8000.warc.gz",
                        "sha1": "000ffb3371eadb507d77d181ca3f0c5d3c74a2fc", "bytes": 460518,
-                       "date_created": "2016-02-22T14:49:07Z"}, {"warc_id": "d3f524b52de0495b9abbf3b36b1fb06f",
-                                                                 "path": "test_1-20151202190229530-00000-29525-GLSS-" +
-                                                                         "F0G5RP-8000.warc.gz",
-                                                                 "sha1": "28076c245bc23d5e18e8531c19700dec869e2f9a",
-                                                                 "bytes": 58048,
-                                                                 "date_created": "2016-02-22T14:37:26Z"}]
+                       "date_created": "2016-02-22T14:49:07Z"},
+                      {"warc_id": "d3f524b52de0495b9abbf3b36b1fb06f",
+                       "path": "test_1-20151202190229530-00000-29525-GLSS-F0G5RP-8000.warc.gz",
+                       "sha1": "28076c245bc23d5e18e8531c19700dec869e2f9a",
+                       "bytes": 58048,
+                       "date_created": "2016-02-22T14:37:26Z"}]
         self.warc_filepaths = [
             os.path.join(self.warc_base_path, "test_1-20151202200525007-00000-30033-GLSS-F0G5RP-8000.warc.gz"),
             os.path.join(self.warc_base_path, "test_1-20151202190229530-00000-29525-GLSS-F0G5RP-8000.warc.gz")]
         self.export_path = tempfile.mkdtemp()
+        self.working_path = tempfile.mkdtemp()
 
     def tearDown(self):
         if os.path.exists(self.export_path):
             shutil.rmtree(self.export_path)
+        if os.path.exists(self.working_path):
+            shutil.rmtree(self.working_path)
 
     @patch("sfmutils.exporter.ApiClient", autospec=True)
     # Mock out Producer
@@ -75,7 +78,7 @@ class TestExporter(tests.TestCase):
 
         }
 
-        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, warc_base_path=self.warc_base_path)
+        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, self.working_path, warc_base_path=self.warc_base_path)
         exporter.mq_config = True
         exporter._producer_connection = mock_connection
         exporter.exchange = mock_exchange
@@ -90,7 +93,7 @@ class TestExporter(tests.TestCase):
                                                       harvest_date_end=harvest_date_end)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, True, item_datetime_start, item_datetime_end, [])
 
-        self.assertTrue(exporter.export_result.success)
+        self.assertTrue(exporter.result.success)
         csv_filepath = os.path.join(self.export_path, "test1.csv")
         self.assertTrue(os.path.exists(csv_filepath))
         with open(csv_filepath, "r") as f:
@@ -138,7 +141,7 @@ class TestExporter(tests.TestCase):
 
         }
 
-        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, warc_base_path=self.warc_base_path)
+        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, self.working_path, warc_base_path=self.warc_base_path)
         exporter.mq_config = True
         exporter._producer_connection = mock_connection
         exporter.exchange = mock_exchange
@@ -152,7 +155,7 @@ class TestExporter(tests.TestCase):
                                                       seed_ids=[], harvest_date_end=None, harvest_date_start=None)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, [])
 
-        self.assertTrue(exporter.export_result.success)
+        self.assertTrue(exporter.result.success)
         txt_filepath = os.path.join(self.export_path, "test1.txt")
         self.assertTrue(os.path.exists(txt_filepath))
         with open(txt_filepath, "r") as f:
@@ -196,7 +199,7 @@ class TestExporter(tests.TestCase):
             "path": self.export_path,
         }
 
-        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, warc_base_path=self.warc_base_path)
+        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, self.working_path, warc_base_path=self.warc_base_path)
 
         exporter.routing_key = "export.start.test.test_user"
         exporter.message = export_message
@@ -209,7 +212,7 @@ class TestExporter(tests.TestCase):
                                                       harvest_date_start=None, harvest_date_end=None)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, ["uid1", "uid2"])
 
-        self.assertTrue(exporter.export_result.success)
+        self.assertTrue(exporter.result.success)
         csv_filepath = os.path.join(self.export_path, "test2.csv")
         self.assertTrue(os.path.exists(csv_filepath))
         with open(csv_filepath, "r") as f:
@@ -237,7 +240,7 @@ class TestExporter(tests.TestCase):
             "path": self.export_path
         }
 
-        exporter = BaseExporter("http://test", None, None, warc_base_path=self.warc_base_path)
+        exporter = BaseExporter("http://test", None, None, self.working_path, warc_base_path=self.warc_base_path)
 
         exporter.routing_key = "export.start.test.test_user"
         exporter.message = export_message
@@ -245,8 +248,8 @@ class TestExporter(tests.TestCase):
 
         mock_api_client_cls.assert_called_once_with("http://test")
 
-        self.assertFalse(exporter.export_result.success)
-        self.assertEqual(CODE_BAD_REQUEST, exporter.export_result.errors[0].code)
+        self.assertFalse(exporter.result.success)
+        self.assertEqual(CODE_BAD_REQUEST, exporter.result.errors[0].code)
 
     @patch("sfmutils.exporter.ApiClient", autospec=True)
     # Mock out Producer
@@ -276,7 +279,7 @@ class TestExporter(tests.TestCase):
             "path": self.export_path
         }
 
-        exporter = BaseExporter("http://test", None, None, warc_base_path=self.warc_base_path)
+        exporter = BaseExporter("http://test", None, None, self.working_path, warc_base_path=self.warc_base_path)
         exporter.mq_config = True
         exporter._producer_connection = mock_connection
         exporter.exchange = mock_exchange
@@ -289,7 +292,7 @@ class TestExporter(tests.TestCase):
         mock_api_client.warcs.assert_called_once_with(exclude_web=True, collection_id="005b131f5f854402afa2b08a4b7ba960",
                                                       seed_ids=[], harvest_date_end=None, harvest_date_start=None)
 
-        self.assertFalse(exporter.export_result.success)
+        self.assertFalse(exporter.result.success)
 
         name, _, kwargs = mock_producer.mock_calls[0]
         self.assertEqual("publish", name)
@@ -313,7 +316,7 @@ class TestExporter(tests.TestCase):
         now = datetime.datetime.now()
         limit_uids = [11, 14]
 
-        exporter = BaseExporter(None, mock_warc_iter_cls, None, warc_base_path=self.warc_base_path)
+        exporter = BaseExporter(None, mock_warc_iter_cls, None, self.working_path, warc_base_path=self.warc_base_path)
 
         exporter._full_json_export(self.warcs, export_filepath, True, now, None, limit_uids)
 

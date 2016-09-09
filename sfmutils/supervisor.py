@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 
 class HarvestSupervisor:
-    def __init__(self, script, mq_host, mq_username, mq_password,
+    def __init__(self, script, mq_host, mq_username, mq_password, working_path,
                  process_owner=None, python_executable="python", log_path="/var/log/sfm",
                  conf_path="/etc/supervisor/conf.d", internal_ip="127.0.0.1", socket_file="/var/run/supervisor.sock",
                  debug=False):
@@ -24,6 +24,7 @@ class HarvestSupervisor:
         self.mq_host = mq_host
         self.mq_username = mq_username
         self.mq_password = mq_password
+        self.working_path = working_path
         self.log_path = log_path
         self.internal_ip = internal_ip
         self.socket_file = socket_file
@@ -76,11 +77,14 @@ class HarvestSupervisor:
             os.remove(seed_filepath)
 
     def _create_conf_file(self, harvest_id, routing_key):
+        # Note that giving a long time to shutdown.
+        # Stream harvester may need to finish processing.
         contents = """[program:{process_group}]
-command={python_executable} {script}{debug} seed {seed_filepath} --streaming --host {mq_host} --username {mq_username} --password {mq_password} --routing-key {routing_key}
+command={python_executable} {script}{debug} seed {seed_filepath} {working_path} --streaming --host {mq_host} --username {mq_username} --password {mq_password} --routing-key {routing_key}
 user={user}
 autostart=true
 autorestart=true
+stopwaitsecs=900
 stderr_logfile={log_path}/{safe_harvest_id}.err.log
 stdout_logfile={log_path}/{safe_harvest_id}.out.log
 """.format(process_group=self._get_process_group(harvest_id),
@@ -88,6 +92,7 @@ stdout_logfile={log_path}/{safe_harvest_id}.out.log
            python_executable=self.python_executable,
            script=self.script,
            seed_filepath=self._get_seed_filepath(harvest_id),
+           working_path=self.working_path,
            mq_host=self.mq_host,
            mq_username=self.mq_username,
            mq_password=self.mq_password,

@@ -20,7 +20,7 @@ class DictHarvestStateStore:
     A harvest state store implementation backed by a dictionary and not persisted.
     """
     def __init__(self):
-        self._state = {}
+        self.state = {}
 
     def get_state(self, resource_type, key):
         """
@@ -30,8 +30,8 @@ class DictHarvestStateStore:
         :param key: Key for the state that is being retrieved.
         :return: Value if the state or None.
         """
-        if resource_type in self._state and key in self._state[resource_type]:
-            return self._state[resource_type][key]
+        if resource_type in self.state and key in self.state[resource_type]:
+            return self.state[resource_type][key]
         else:
             return None
 
@@ -47,17 +47,17 @@ class DictHarvestStateStore:
         """
         log.debug("Setting state for %s with key %s to %s", resource_type, key, value)
         if value is not None:
-            if resource_type not in self._state:
-                self._state[resource_type] = {}
-            self._state[resource_type][key] = value
+            if resource_type not in self.state:
+                self.state[resource_type] = {}
+            self.state[resource_type][key] = value
         else:
             # Clearing value
-            if resource_type in self._state and key in self._state[resource_type]:
+            if resource_type in self.state and key in self.state[resource_type]:
                 # Delete key
-                del self._state[resource_type][key]
+                del self.state[resource_type][key]
                 # If resource type is empty then delete
-                if not self._state[resource_type]:
-                    del self._state[resource_type]
+                if not self.state[resource_type]:
+                    del self.state[resource_type]
 
 
 class JsonHarvestStateStore(DictHarvestStateStore):
@@ -77,7 +77,7 @@ class JsonHarvestStateStore(DictHarvestStateStore):
     def _load_state(self):
         if os.path.exists(self.state_filepath):
             with codecs.open(self.state_filepath, "r") as state_file:
-                self._state = json.load(state_file)
+                self.state = json.load(state_file)
 
     def get_state(self, resource_type, key):
         self._load_state()
@@ -90,7 +90,7 @@ class JsonHarvestStateStore(DictHarvestStateStore):
             os.makedirs(self.path)
         # This way if the write fails, the original file will still be in place.
         with codecs.open(self.state_tmp_filepath, 'w', encoding="utf-8") as state_file:
-            json.dump(self._state, state_file)
+            json.dump(self.state, state_file)
         shutil.move(self.state_tmp_filepath, self.state_filepath)
 
 
@@ -107,3 +107,28 @@ class NullHarvestStateStore():
 
     def set_state(self, resource_type, key, value):
         pass
+
+
+class DelayedSetStateStoreAdapter():
+    """
+    An adapter for a state store that keeps track of sets and delays
+    passing them on the the underlying state store.
+    """
+    def __init__(self, state_store):
+        self.state_store = state_store
+        self.delayed_state = DictHarvestStateStore()
+
+    def get_state(self, resource_type, key):
+        return self.delayed_state.get_state(resource_type, key) or self.state_store.get_state(resource_type, key)
+
+    def set_state(self, resource_type, key, value):
+        self.delayed_state.set_state(resource_type, key, value)
+
+    def pass_state(self):
+        """
+        Set the state on the underlying state store.
+        """
+        for resource_type, key_values in self.delayed_state.state.items():
+            for key, value in key_values.items():
+                self.state_store.set_state(resource_type, key, value)
+        self.delayed_state = DictHarvestStateStore()

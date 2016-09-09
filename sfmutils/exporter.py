@@ -13,6 +13,7 @@ import codecs
 import iso8601
 import argparse
 import sys
+import shutil
 from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE
 
 log = logging.getLogger(__name__)
@@ -36,12 +37,11 @@ class ExportResult(BaseResult):
 
 class BaseExporter(BaseConsumer):
 
-    def __init__(self, api_base_url, warc_iter_cls, table_cls, mq_config=None, warc_base_path=None):
-        BaseConsumer.__init__(self, mq_config=mq_config)
+    def __init__(self, api_base_url, warc_iter_cls, table_cls, working_path, mq_config=None, warc_base_path=None):
+        BaseConsumer.__init__(self, mq_config=mq_config, working_path=working_path)
         self.api_client = ApiClient(api_base_url)
         self.warc_iter_cls = warc_iter_cls
         self.table_cls = table_cls
-        self.export_result = None
         # This is for unit tests only.
         self.warc_base_path = warc_base_path
 
@@ -51,8 +51,8 @@ class BaseExporter(BaseConsumer):
         export_id = self.message["id"]
         log.info("Performing export %s", export_id)
 
-        self.export_result = ExportResult()
-        self.export_result.started = datetime.datetime.now()
+        self.result = ExportResult()
+        self.result.started = datetime.datetime.now()
 
         # Get the WARCs from the API
         collection_id = self.message.get("collection", {}).get("id")
@@ -68,18 +68,20 @@ class BaseExporter(BaseConsumer):
             warc_paths = self._get_warc_paths(collection_id, seed_ids, harvest_date_start, harvest_date_end)
             export_format = self.message["format"]
             export_path = self.message["path"]
-            base_filepath = os.path.join(export_path, export_id)
             dedupe = self.message.get("dedupe", False)
             item_date_start = iso8601.parse_date(
                 self.message["item_date_start"]) if "item_date_start" in self.message else None
             item_date_end = iso8601.parse_date(
                 self.message["item_date_end"]) if "item_date_end" in self.message else None
+            temp_path = os.path.join(self.working_path, "tmp")
+            base_filepath = os.path.join(temp_path, export_id)
 
             if warc_paths:
 
-                # Create the export directory
-                if not os.path.exists(export_path):
-                    os.makedirs(export_path)
+                # Clean the temp directory
+                if os.path.exists(temp_path):
+                    shutil.rmtree(temp_path)
+                os.makedirs(temp_path)
 
                 # We get a lot of bang from PETL
                 export_formats = {
@@ -105,20 +107,25 @@ class BaseExporter(BaseConsumer):
                     log.info("Exporting to %s", filepath)
                     export_formats[export_format][1](table, filepath)
                 else:
-                    self.export_result.errors.append(
+                    self.result.errors.append(
                         Msg(CODE_UNSUPPORTED_EXPORT_FORMAT, "{} is not supported".format(export_format)))
-                    self.export_result.success = False
+                    self.result.success = False
+
+                # Move files from temp path to export path
+                if os.path.exists(export_path):
+                    shutil.rmtree(export_path)
+                shutil.move(temp_path, export_path)
 
             else:
-                self.export_result.errors.append(Msg(CODE_NO_WARCS, "No WARC files from which to export"))
-                self.export_result.success = False
+                self.result.errors.append(Msg(CODE_NO_WARCS, "No WARC files from which to export"))
+                self.result.success = False
 
         else:
-            self.export_result.errors.append(Msg(CODE_BAD_REQUEST, "Request export of a seed or collection."))
-            self.export_result.success = False
+            self.result.errors.append(Msg(CODE_BAD_REQUEST, "Request export of a seed or collection."))
+            self.result.success = False
 
-        self.export_result.ended = datetime.datetime.now()
-        self._send_response_message(self.routing_key, export_id, self.export_result)
+        self.result.ended = datetime.datetime.now()
+        self._send_response_message(self.routing_key, export_id, self.result)
 
     def _full_json_export(self, warc_paths, export_filepath, dedupe, item_date_start, item_date_end, seed_uids):
         with codecs.open(export_filepath, "w") as f:
@@ -141,8 +148,8 @@ class BaseExporter(BaseConsumer):
             if os.path.exists(warc_path):
                 warc_paths.append(warc_path)
             else:
-                self.export_result.errors.append(Msg(CODE_WARC_MISSING, "{} is missing".format(warc_path)))
-                self.export_result.success = False
+                self.result.errors.append(Msg(CODE_WARC_MISSING, "{} is missing".format(warc_path)))
+                self.result.success = False
         log.debug("Warcs are %s", warc_paths)
         return warc_paths
 
@@ -164,24 +171,24 @@ class BaseExporter(BaseConsumer):
         response_routing_key = export_request_routing_key.replace("start", "status")
         self._publish_message(response_routing_key, message)
 
-    def export_from_file(self, filepath, routing_key=None):
-        """
-        Performs a export based on an export start message contained in the
-        provided filepath.
-
-        SIGTERM or SIGINT (Ctrl+C) will interrupt.
-
-        :param filepath: filepath of the export start message
-        :param routing_key: routing key of the export start message
-        """
-        log.debug("Exporting from file %s", filepath)
-        with codecs.open(filepath, "r") as f:
-            self.message = json.load(f)
-
-        self.routing_key = routing_key or ""
-
-        self.on_message()
-        return self.export_result
+    # def export_from_file(self, filepath, routing_key=None):
+    #     """
+    #     Performs a export based on an export start message contained in the
+    #     provided filepath.
+    #
+    #     SIGTERM or SIGINT (Ctrl+C) will interrupt.
+    #
+    #     :param filepath: filepath of the export start message
+    #     :param routing_key: routing key of the export start message
+    #     """
+    #     log.debug("Exporting from file %s", filepath)
+    #     with codecs.open(filepath, "r") as f:
+    #         self.message = json.load(f)
+    #
+    #     self.routing_key = routing_key or ""
+    #
+    #     self.on_message()
+    #     return self.result
 
     @staticmethod
     def main(cls, queue, routing_keys):
@@ -204,8 +211,6 @@ class BaseExporter(BaseConsumer):
         parser = argparse.ArgumentParser()
         parser.add_argument("--debug", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
                             default="False", const="True")
-        # parser.add_argument("--debug-http", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
-        #                     default="False", const="True")
 
         subparsers = parser.add_subparsers(dest="command")
 
@@ -215,14 +220,16 @@ class BaseExporter(BaseConsumer):
         service_parser.add_argument("username")
         service_parser.add_argument("password")
         service_parser.add_argument("api")
+        service_parser.add_argument("working_path")
+        service_parser.add_argument("--skip-resume", action="store_true")
 
         file_parser = subparsers.add_parser("file", help="Export based on a file.")
         file_parser.add_argument("filepath", help="Filepath of the export file.")
         file_parser.add_argument("api", help="Base url of SFM-UI API")
+        file_parser.add_argument("working_path")
         file_parser.add_argument("--host")
         file_parser.add_argument("--username")
         file_parser.add_argument("--password")
-        file_parser.add_argument("--routing-key")
 
         args = parser.parse_args()
 
@@ -231,19 +238,21 @@ class BaseExporter(BaseConsumer):
                             level=logging.DEBUG if args.debug else logging.INFO)
 
         if args.command == "service":
-            exporter = cls(args.api, mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE,
+            exporter = cls(args.api, args.working_path, mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE,
                                                         {queue: routing_keys}))
+            if not args.skip_resume:
+                exporter.resume_from_file()
             exporter.run()
         elif args.command == "file":
             mq_config = MqConfig(args.host, args.username, args.password, EXCHANGE, None) \
                 if args.host and args.username and args.password else None
-            exporter = cls(args.api, mq_config=mq_config)
-            exporter.export_from_file(args.filepath, routing_key=args.routing_key)
-            if exporter.export_result:
-                log.info("Result is: %s", exporter.export_result)
+            exporter = cls(args.api, args.working_path, mq_config=mq_config)
+            exporter.message_from_file(args.filepath)
+            if exporter.result:
+                log.info("Result is: %s", exporter.result)
                 sys.exit(0)
             else:
-                log.warning("Result is: %s", exporter.export_result)
+                log.warning("Result is: %s", exporter.result)
                 sys.exit(1)
 
 

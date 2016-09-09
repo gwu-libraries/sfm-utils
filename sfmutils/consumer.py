@@ -2,6 +2,9 @@ import logging
 from kombu import Connection, Queue, Exchange, Producer
 from kombu.mixins import ConsumerMixin
 import json
+import tempfile
+import os
+import codecs
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +67,7 @@ class BaseConsumer(ConsumerProducerMixin):
 
     To send a message, use self.producer.publish().
     """
-    def __init__(self, mq_config=None):
+    def __init__(self, mq_config=None, persist_messages=False, working_path=None):
         self.mq_config = mq_config
         if self.mq_config and self.mq_config.host and self.mq_config.username and self.mq_config.password:
             self.connection = Connection(transport="librabbitmq",
@@ -78,8 +81,17 @@ class BaseConsumer(ConsumerProducerMixin):
             self.connection = None
             self.exchange = None
 
+        self.persist_messages = persist_messages
+        assert persist_messages == False or working_path
+        self.working_path = working_path
+        if not os.path.exists(self.working_path):
+            os.makedirs(self.working_path)
+        log.debug("Temporary path is %s", self.working_path)
+
         self.message = None
         self.routing_key = None
+        self.message_filepath = os.path.join(self.working_path, "last_message.json")
+        self.result = None
 
     def get_consumers(self, Consumer, channel):
         assert self.mq_config
@@ -115,10 +127,25 @@ class BaseConsumer(ConsumerProducerMixin):
         self.routing_key = message_obj.delivery_info["routing_key"]
         self.message = message
 
+        # Persist the message
+        with codecs.open(self.message_filepath, 'w') as f:
+            json.dump({
+                "routing_key": self.routing_key,
+                "message": self.message
+            }, f)
+        log.debug("Persisted message to %s", self.message_filepath)
+
         # Acknowledge the message
         message_obj.ack()
 
-        self.on_message()
+        # Don't want to get in a loop, so when an exception occurs, delete the message.
+        try:
+            self.on_message()
+        finally:
+            # Delete the message
+            if os.path.exists(self.message_filepath):
+                os.remove(self.message_filepath)
+                log.debug("Deleted %s", self.message_filepath)
 
     def on_message(self):
         """
@@ -128,6 +155,40 @@ class BaseConsumer(ConsumerProducerMixin):
         will be populated based on the new message.
         """
         pass
+
+    def message_from_file(self, filepath, delete=False):
+        """
+        Loads message from file and invokes on_message().
+
+        :param filepath: filepath of the message
+        :param delete: If True, deletes after on_message() is completed
+        """
+        log.info("Loading from file %s", filepath)
+
+        with codecs.open(filepath, "r") as f:
+            msg_container = json.load(f)
+
+        self.routing_key = msg_container['routing_key']
+        self.message = msg_container['message']
+        self.message_filepath = filepath
+
+        self.on_message()
+
+        # Delete the message
+        if delete:
+            os.remove(self.message_filepath)
+            log.debug("Deleted %s", self.message_filepath)
+
+        if self.result is not None:
+            return self.result
+
+    def resume_from_file(self):
+        """
+        If a persisted message exists, invoke that message.
+        """
+        if os.path.exists(self.message_filepath):
+            log.info("%s exists, so resuming", self.message_filepath)
+            self.message_from_file(self.message_filepath, delete=True)
 
     def _publish_message(self, routing_key, message, trunate_debug_length=None):
         message_body = json.dumps(message, indent=4)
