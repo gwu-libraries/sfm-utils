@@ -37,31 +37,32 @@ class TestWarcIter(TestCase):
 
     def test_not_line_oriented(self):
         count = 0
-        for count, (item_type, item_id, item_date, item) in enumerate(
+        for count, post in enumerate(
                 TestableNotLineOrientedWarcIter(
                     self._warc_filepath("test_1-20151202190229530-00000-29525-GLSS-F0G5RP-8000.warc.gz")), start=1):
-            self.assertEqual("twitter_status", item_type)
-            self.assertTrue(item.get("id"))
-            self.assertTrue(item_id)
-            self.assertTrue(item_date)
+            self.assertEqual("twitter_status", post.type)
+            self.assertTrue(post.item.get("id"))
+            self.assertTrue(post.id)
+            self.assertTrue(post.date)
+            self.assertTrue(post.url)
         self.assertEqual(1229, count)
 
     def test_multiple_warcs(self):
         count = 0
         filepath = self._warc_filepath("test_1-20151202190229530-00000-29525-GLSS-F0G5RP-8000.warc.gz")
-        for count, (item_type, item_id, item_date, item) in enumerate(
+        for count, status in enumerate(
                 TestableNotLineOrientedWarcIter((filepath, filepath)), start=1):
-            self.assertEqual("twitter_status", item_type)
-            self.assertTrue(item.get("id"))
+            self.assertEqual("twitter_status", status.type)
+            self.assertTrue(status.item.get("id"))
         self.assertEqual(1229 * 2, count)
 
     def test_dedupe(self):
         count = 0
         filepath = self._warc_filepath("test_1-20151202190229530-00000-29525-GLSS-F0G5RP-8000.warc.gz")
-        for count, (item_type, item_id, item_date, item) in enumerate(
+        for count, status in enumerate(
                 TestableNotLineOrientedWarcIter((filepath, filepath)).iter(dedupe=True), start=1):
-            self.assertEqual("twitter_status", item_type)
-            self.assertTrue(item.get("id"))
+            self.assertEqual("twitter_status", status.type)
+            self.assertTrue(status.item.get("id"))
         self.assertEqual(1229, count)
 
     def test_item_type_limit(self):
@@ -74,13 +75,14 @@ class TestWarcIter(TestCase):
 
     def test_line_oriented(self):
         count = 0
-        for count, (item_type, item_id, item_date, item) in enumerate(
+        for count, status in enumerate(
                 TestableLineOrientedWarcIter(
                     self._warc_filepath("test_1-20151202200525007-00000-30033-GLSS-F0G5RP-8000.warc.gz")), start=1):
-            self.assertEqual("twitter_status", item_type)
-            self.assertTrue(item.get("id"))
-            self.assertTrue(item_id)
-            self.assertTrue(item_date)
+            self.assertEqual("twitter_status", status.type)
+            self.assertTrue(status.item.get("id"))
+            self.assertTrue(status.id)
+            self.assertTrue(status.date)
+            self.assertTrue(status.url)
         self.assertEqual(111, count)
 
     def test_select_record(self):
@@ -91,23 +93,23 @@ class TestWarcIter(TestCase):
     def test_item_date_start(self):
         count = 0
         item_date_start = date_parse("2015-11-26T16:17:14Z")
-        for count, (item_type, item_id, item_date, item) in enumerate(
+        for count, status in enumerate(
                 TestableNotLineOrientedWarcIter(
                     self._warc_filepath("test_1-20151202190229530-00000-29525-GLSS-F0G5RP-8000.warc.gz")).iter(
                     item_date_start=item_date_start), start=1):
-            self.assertEqual("twitter_status", item_type)
-            self.assertTrue(item.get("id"))
-            self.assertTrue(item_date >= item_date_start)
+            self.assertEqual("twitter_status", status.type)
+            self.assertTrue(status.item.get("id"))
+            self.assertTrue(status.date >= item_date_start)
         self.assertEqual(800, count)
 
     def test_item_date_end(self):
         count = 0
         item_date_end = date_parse("2015-11-26T16:17:14Z")
-        for count, (item_type, item_id, item_date, item) in enumerate(
+        for count, status in enumerate(
                 TestableNotLineOrientedWarcIter(
                     self._warc_filepath("test_1-20151202190229530-00000-29525-GLSS-F0G5RP-8000.warc.gz")).iter(
                     item_date_end=item_date_end), start=1):
-            self.assertEqual("twitter_status", item_type)
-            self.assertTrue(item.get("id"))
-            self.assertTrue(item_date <= item_date_end)
+            self.assertEqual("twitter_status", status.type)
+            self.assertTrue(status.item.get("id"))
+            self.assertTrue(status.date <= item_date_end)
         self.assertEqual(430, count)

@@ -42,6 +42,8 @@ class HarvestResult(BaseResult):
         self.token_updates = {}
         # Map of tokens to uids for tokens for which uids have been found.
         self.uids = {}
+        # A counter of harvested items for testing purposes.
+        self.harvest_counter = Counter()
 
     def _result_name(self):
         return "Harvest"
@@ -115,7 +117,7 @@ class BaseHarvester(BaseConsumer):
     """
     def __init__(self, working_path, mq_config=None, stream_restart_interval_secs=30 * 60, debug=False,
                  use_warcprox=True):
-        BaseConsumer.__init__(self, working_path=working_path, mq_config=mq_config)
+        BaseConsumer.__init__(self, working_path=working_path, mq_config=mq_config, persist_messages=True)
         self.stream_restart_interval_secs = stream_restart_interval_secs
         self.is_streaming = False
         self.routing_key = ""
@@ -137,7 +139,7 @@ class BaseHarvester(BaseConsumer):
     def on_message(self):
         assert self.message
 
-        log.info("Harvesting by message")
+        log.info("Harvesting by message with id %s", self.message["id"])
 
         self.result_filepath = os.path.join(self.working_path, "{}_result.json".format(safe_string(self.message["id"])))
 
@@ -273,10 +275,13 @@ class BaseHarvester(BaseConsumer):
 
     @staticmethod
     def _list_warcs(path):
-        warcs = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and
-                 (f.endswith(".warc") or f.endswith(".warc.gz"))]
-        if len(warcs) == 0:
-            log.warning("No warcs found in %s", path)
+        warcs = []
+        if os.path.exists(path):
+            warcs = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and
+                     (f.endswith(".warc") or f.endswith(".warc.gz"))]
+            log.debug("Found following WARCs: %s", warcs)
+        else:
+            log.warn("Warc path %s does not exist. This may be OK.", path)
         return warcs
 
     @staticmethod
@@ -405,11 +410,8 @@ class BaseHarvester(BaseConsumer):
             warc_filename = self.warc_processing_queue.get()
             # Make sure file exists. Possible that same file will be put in queue multiple times.
             warc_filepath = os.path.join(self.warc_temp_dir, warc_filename)
-            # harvest_id = self.message["id"]
-            # collection_set_id = self.message["collection_set"]["id"]
-            # harvest_path = self.message["path"]
             if os.path.exists(warc_filepath):
-                log.debug("Processing %s", warc_filename)
+                log.info("Processing %s", warc_filename)
 
                 # Process the warc
                 self.process_warc(warc_filepath)
@@ -498,10 +500,11 @@ class BaseHarvester(BaseConsumer):
         service_parser.add_argument("username")
         service_parser.add_argument("password")
         service_parser.add_argument("working_path")
+        service_parser.add_argument("--skip-resume", action="store_true")
 
         seed_parser = subparsers.add_parser("seed", help="Harvest based on a seed file.")
         seed_parser.add_argument("filepath", help="Filepath of the seed file.")
-        service_parser.add_argument("working_path")
+        seed_parser.add_argument("working_path")
         seed_parser.add_argument("--streaming", action="store_true", help="Run in streaming mode.")
         seed_parser.add_argument("--host")
         seed_parser.add_argument("--username")
@@ -519,12 +522,14 @@ class BaseHarvester(BaseConsumer):
         if args.command == "service":
             harvester = cls(args.working_path, mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE,
                                                                   {queue: routing_keys}), debug=args.debug)
+            if not args.skip_resume:
+                harvester.resume_from_file()
             harvester.run()
         elif args.command == "seed":
             mq_config = MqConfig(args.host, args.username, args.password, EXCHANGE, None) \
                 if args.host and args.username and args.password else None
             harvester = cls(args.working_path, mq_config=mq_config, debug=args.debug)
-            harvester.harvest_from_file(args.filepath, routing_key=args.routing_key, is_streaming=args.streaming)
+            harvester.harvest_from_file(args.filepath, is_streaming=args.streaming)
             if harvester.result:
                 log.info("Result is: %s", harvester.result)
                 sys.exit(0)

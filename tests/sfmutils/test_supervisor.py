@@ -61,13 +61,13 @@ class TestHarvestSupervisor(TestCase):
         # Seed file contains message.
         with open(os.path.join(conf_path, "test_1.json")) as f:
             seed = json.load(f)
-        self.assertDictEqual(message, seed)
+        self.assertDictEqual(message, seed["message"])
 
         # Conf file as expected
         with open(os.path.join(conf_path, "test_1.conf")) as f:
             conf = f.read()
         self.assertEqual("""[program:test_1]
-command=python /opt/sfm/test_harvester.py --debug=True seed {conf_path}/test_1.json {working_path} --streaming --host test_host --username test_user --password test_password --routing-key harvest.start.test.test_search
+command=python /opt/sfm/test_harvester.py --debug=True seed {conf_path}/test_1.json {working_path} --streaming --host test_host --username test_user --password test_password
 user={user}
 autostart=true
 autorestart=true

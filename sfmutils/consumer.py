@@ -81,16 +81,18 @@ class BaseConsumer(ConsumerProducerMixin):
             self.connection = None
             self.exchange = None
 
+        self.message_filepath = None
         self.persist_messages = persist_messages
         assert persist_messages == False or working_path
         self.working_path = working_path
-        if not os.path.exists(self.working_path):
-            os.makedirs(self.working_path)
-        log.debug("Temporary path is %s", self.working_path)
-
+        if self.working_path:
+            if not os.path.exists(self.working_path):
+                os.makedirs(self.working_path)
+            log.debug("Temporary path is %s", self.working_path)
+            self.message_filepath = os.path.join(self.working_path, "last_message.json")
         self.message = None
         self.routing_key = None
-        self.message_filepath = os.path.join(self.working_path, "last_message.json")
+
         self.result = None
 
     def get_consumers(self, Consumer, channel):
@@ -128,12 +130,13 @@ class BaseConsumer(ConsumerProducerMixin):
         self.message = message
 
         # Persist the message
-        with codecs.open(self.message_filepath, 'w') as f:
-            json.dump({
-                "routing_key": self.routing_key,
-                "message": self.message
-            }, f)
-        log.debug("Persisted message to %s", self.message_filepath)
+        if self.persist_messages:
+            with codecs.open(self.message_filepath, 'w') as f:
+                json.dump({
+                    "routing_key": self.routing_key,
+                    "message": self.message
+                }, f)
+            log.debug("Persisted message to %s", self.message_filepath)
 
         # Acknowledge the message
         message_obj.ack()
@@ -143,7 +146,7 @@ class BaseConsumer(ConsumerProducerMixin):
             self.on_message()
         finally:
             # Delete the message
-            if os.path.exists(self.message_filepath):
+            if self.persist_messages and os.path.exists(self.message_filepath):
                 os.remove(self.message_filepath)
                 log.debug("Deleted %s", self.message_filepath)
 
@@ -189,6 +192,8 @@ class BaseConsumer(ConsumerProducerMixin):
         if os.path.exists(self.message_filepath):
             log.info("%s exists, so resuming", self.message_filepath)
             self.message_from_file(self.message_filepath, delete=True)
+        else:
+            log.info("%s does not exist, so not resuming", self.message_filepath)
 
     def _publish_message(self, routing_key, message, trunate_debug_length=None):
         message_body = json.dumps(message, indent=4)

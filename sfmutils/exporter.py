@@ -28,6 +28,7 @@ class ExportResult(BaseResult):
     """
     Keeps track of the results of an export.
     """
+
     def __init__(self):
         BaseResult.__init__(self)
 
@@ -36,12 +37,13 @@ class ExportResult(BaseResult):
 
 
 class BaseExporter(BaseConsumer):
-
-    def __init__(self, api_base_url, warc_iter_cls, table_cls, working_path, mq_config=None, warc_base_path=None):
-        BaseConsumer.__init__(self, mq_config=mq_config, working_path=working_path)
+    def __init__(self, api_base_url, warc_iter_cls, table_cls, working_path, mq_config=None, warc_base_path=None,
+                 limit_item_types=None):
+        BaseConsumer.__init__(self, mq_config=mq_config, working_path=working_path, persist_messages=True)
         self.api_client = ApiClient(api_base_url)
         self.warc_iter_cls = warc_iter_cls
         self.table_cls = table_cls
+        self.limit_item_types = limit_item_types
         # This is for unit tests only.
         self.warc_base_path = warc_base_path
 
@@ -129,10 +131,11 @@ class BaseExporter(BaseConsumer):
 
     def _full_json_export(self, warc_paths, export_filepath, dedupe, item_date_start, item_date_end, seed_uids):
         with codecs.open(export_filepath, "w") as f:
-            for _, _, _, photo in self.warc_iter_cls(warc_paths, seed_uids).iter(dedupe=dedupe,
-                                                                                 item_date_start=item_date_start,
-                                                                                 item_date_end=item_date_end):
-                json.dump(photo, f)
+            for status in self.warc_iter_cls(warc_paths, seed_uids).iter(dedupe=dedupe,
+                                                                         item_date_start=item_date_start,
+                                                                         item_date_end=item_date_end,
+                                                                         limit_item_types=self.limit_item_types):
+                json.dump(status.item, f)
                 f.write("\n")
 
     def _get_warc_paths(self, collection_id, seed_ids, harvest_date_start, harvest_date_end):
@@ -170,25 +173,6 @@ class BaseExporter(BaseConsumer):
         # Routing key may be none
         response_routing_key = export_request_routing_key.replace("start", "status")
         self._publish_message(response_routing_key, message)
-
-    # def export_from_file(self, filepath, routing_key=None):
-    #     """
-    #     Performs a export based on an export start message contained in the
-    #     provided filepath.
-    #
-    #     SIGTERM or SIGINT (Ctrl+C) will interrupt.
-    #
-    #     :param filepath: filepath of the export start message
-    #     :param routing_key: routing key of the export start message
-    #     """
-    #     log.debug("Exporting from file %s", filepath)
-    #     with codecs.open(filepath, "r") as f:
-    #         self.message = json.load(f)
-    #
-    #     self.routing_key = routing_key or ""
-    #
-    #     self.on_message()
-    #     return self.result
 
     @staticmethod
     def main(cls, queue, routing_keys):
@@ -238,8 +222,9 @@ class BaseExporter(BaseConsumer):
                             level=logging.DEBUG if args.debug else logging.INFO)
 
         if args.command == "service":
-            exporter = cls(args.api, args.working_path, mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE,
-                                                        {queue: routing_keys}))
+            exporter = cls(args.api, args.working_path,
+                           mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE,
+                                              {queue: routing_keys}))
             if not args.skip_resume:
                 exporter.resume_from_file()
             exporter.run()
@@ -260,13 +245,16 @@ class BaseTable(petl.Table):
     """
     A base PETL Table.
     """
-    def __init__(self, warc_paths, dedupe, item_date_start, item_date_end, seed_uids, warc_iter_cls):
+
+    def __init__(self, warc_paths, dedupe, item_date_start, item_date_end, seed_uids, warc_iter_cls,
+                 limit_item_types=None):
         self.warc_paths = warc_paths
         self.dedupe = dedupe
         self.item_date_start = item_date_start
         self.item_date_end = item_date_end
         self.seed_uids = seed_uids
         self.warc_iter_cls = warc_iter_cls
+        self.limit_item_types = limit_item_types
 
     def _header_row(self):
         """
@@ -291,14 +279,15 @@ class BaseTable(petl.Table):
     def __iter__(self):
         # yield the header row
         yield self._header_row()
-        for _, _, _, item in self.warc_iter_cls(self.warc_paths,
-                                                self.seed_uids).iter(dedupe=self.dedupe,
-                                                                     item_date_start=self.item_date_start,
-                                                                     item_date_end=self.item_date_end):
+        for post in self.warc_iter_cls(self.warc_paths,
+                                       self.seed_uids).iter(dedupe=self.dedupe,
+                                                            item_date_start=self.item_date_start,
+                                                            item_date_end=self.item_date_end,
+                                                            limit_item_types=self.limit_item_types):
             try:
-                yield self._row(item)
+                yield self._row(post.item)
             except KeyError, e:
-                log.warn("Invalid key %s in %s", e.message, json.dumps(item, indent=4))
+                log.warn("Invalid key %s in %s", e.message, json.dumps(post.item, indent=4))
 
 
 def to_lineoriented_json(table, source):

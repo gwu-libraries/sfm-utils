@@ -49,10 +49,13 @@ class HarvestSupervisor:
 
         # Write seed file
         with open(self._get_seed_filepath(harvest_id), 'w') as f:
-            json.dump(harvest_start_message, f)
+            json.dump({
+                "routing_key": routing_key,
+                "message": harvest_start_message
+            }, f)
 
         # Create conf file
-        self._create_conf_file(harvest_id, routing_key, )
+        self._create_conf_file(harvest_id)
 
         time.sleep(1)
         self._reload_config()
@@ -76,11 +79,11 @@ class HarvestSupervisor:
             log.debug("Deleting seed %s", seed_filepath)
             os.remove(seed_filepath)
 
-    def _create_conf_file(self, harvest_id, routing_key):
+    def _create_conf_file(self, harvest_id):
         # Note that giving a long time to shutdown.
         # Stream harvester may need to finish processing.
         contents = """[program:{process_group}]
-command={python_executable} {script}{debug} seed {seed_filepath} {working_path} --streaming --host {mq_host} --username {mq_username} --password {mq_password} --routing-key {routing_key}
+command={python_executable} {script}{debug} seed {seed_filepath} {working_path} --streaming --host {mq_host} --username {mq_username} --password {mq_password}
 user={user}
 autostart=true
 autorestart=true
@@ -96,7 +99,6 @@ stdout_logfile={log_path}/{safe_harvest_id}.out.log
            mq_host=self.mq_host,
            mq_username=self.mq_username,
            mq_password=self.mq_password,
-           routing_key=routing_key,
            user=self.process_owner,
            log_path=self.log_path,
            debug=" --debug=True" if self.debug else "")

@@ -5,9 +5,12 @@ import argparse
 import logging
 import sys
 import os
+from collections import namedtuple
 from urllib3.exceptions import ProtocolError
 
 log = logging.getLogger(__name__)
+
+IterItem = namedtuple('IterItem', ['type', 'id', 'date', 'url', 'item'])
 
 
 class BaseWarcIter:
@@ -44,6 +47,9 @@ class BaseWarcIter:
             log.debug("File %s. Processed %s records. Yielded %s items.", filename, record_count, yield_count)
 
     def iter(self, limit_item_types=None, dedupe=False, item_date_start=None, item_date_end=None):
+        """
+        :return: Iterator returning IterItems.
+        """
         seen_ids = {}
         for filepath in self.filepaths:
             log.info("Iterating over %s", filepath)
@@ -96,7 +102,7 @@ class BaseWarcIter:
                                     if item is not None:
                                         yield_count += 1
                                         self._debug_counts(filename, record_count, yield_count, by_record_count=False)
-                                        yield item_type, item_id, item_date, item
+                                        yield IterItem(item_type, item_id, item_date, record.url, item)
                                     else:
                                         log.warn("Bad response in record %s", record.header.record_id)
 
@@ -114,7 +120,7 @@ class BaseWarcIter:
         return True
 
     def print_iter(self, pretty=False, fp=sys.stdout, limit_item_types=None, print_item_type=False, dedupe=False):
-        for item_type,_, _,item in self.iter(limit_item_types=limit_item_types, dedupe=dedupe):
+        for item_type,_, _, _, item in self.iter(limit_item_types=limit_item_types, dedupe=dedupe):
             if print_item_type:
                 fp.write("{}:".format(item_type))
             json.dump(item, fp, indent=4 if pretty else None)
