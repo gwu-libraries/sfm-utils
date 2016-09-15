@@ -116,7 +116,7 @@ class BaseHarvester(BaseConsumer):
     Subclasses should overrride harvest_seeds().
     """
     def __init__(self, working_path, mq_config=None, stream_restart_interval_secs=30 * 60, debug=False,
-                 use_warcprox=True):
+                 use_warcprox=True, queue_warc_files_interval_secs=10 * 60):
         BaseConsumer.__init__(self, working_path=working_path, mq_config=mq_config, persist_messages=True)
         self.stream_restart_interval_secs = stream_restart_interval_secs
         self.is_streaming = False
@@ -130,6 +130,8 @@ class BaseHarvester(BaseConsumer):
         self.use_warcprox = use_warcprox
         self.warc_processing_queue = Queue()
         self.result_filepath = None
+        self.queue_warc_files_interval_secs = queue_warc_files_interval_secs
+        self.queue_warc_files_timer = None
 
         # Create and start warc processing thread.
         self.warc_processing_thread = threading.Thread(target=self._process_warc_thread)
@@ -169,6 +171,10 @@ class BaseHarvester(BaseConsumer):
             # stop_event tells the harvester to stop harvest_seeds.
             # This will allow warcprox to exit.
             self.stop_harvest_seeds_event.set()
+            if self.restart_stream_timer:
+                self.restart_stream_timer.cancel()
+            if self.queue_warc_files_timer:
+                self.queue_warc_files_timer.cancel()
 
         signal.signal(signal.SIGTERM, shutdown)
         signal.signal(signal.SIGINT, shutdown)
@@ -185,6 +191,9 @@ class BaseHarvester(BaseConsumer):
         if self.is_streaming:
             self.restart_stream_timer = threading.Timer(self.stream_restart_interval_secs, self._restart_stream)
             self.restart_stream_timer.start()
+
+        # Start a queue warc files timer
+        self.queue_warc_files_timer = threading.Timer(self.queue_warc_files_interval_secs, self._queue_warc_files)
 
         while not self.stop_harvest_loop_event.is_set():
             # Reset the stop_harvest_seeds_event
@@ -215,6 +224,10 @@ class BaseHarvester(BaseConsumer):
         if self.restart_stream_timer:
             self.restart_stream_timer.cancel()
 
+        # Turn off the queue WARC files timer
+        if self.queue_warc_files_timer:
+            self.queue_warc_files_timer.cancel()
+
         # Finish processing
         self._finish_processing()
 
@@ -240,10 +253,18 @@ class BaseHarvester(BaseConsumer):
             os.remove(self.result_filepath)
 
     def _queue_warc_files(self):
-        # Process warc files
+        log.debug("Queueing WARC files")
+        # Stop the timer
+        if self.queue_warc_files_timer:
+            self.queue_warc_files_timer.cancel()
+
+        # Queue warc files
         for warc_filename in self._list_warcs(self.warc_temp_dir):
             log.debug("Queueing %s", warc_filename)
             self.warc_processing_queue.put(warc_filename)
+
+        # Restart the timer
+        self.queue_warc_files_timer = threading.Timer(self.queue_warc_files_interval_secs, self._queue_warc_files)
 
     def harvest_from_file(self, filepath, is_streaming=False, delete=False):
         """
