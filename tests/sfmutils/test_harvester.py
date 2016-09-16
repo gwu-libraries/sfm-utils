@@ -44,7 +44,7 @@ def write_message_file(message):
 
 class TestableHarvester(BaseHarvester):
     def __init__(self, working_path, connection=None, exchange=None, raise_exception_on_count=0, shutdown_on_count=0):
-        BaseHarvester.__init__(self, working_path, stream_restart_interval_secs=5)
+        BaseHarvester.__init__(self, working_path, stream_restart_interval_secs=5, warc_rollover_secs=120)
         if connection:
             self.mq_config = True
             self._producer_connection = connection
@@ -301,7 +301,8 @@ class TestBaseHarvester(TestCase):
         self.assertEqual(1, harvester.harvest_seed_call_count)
         self.assertEqual(1, harvester.process_warc_call_count)
 
-        mock_warced_class.assert_called_once_with("test_1", harvester.warc_temp_dir, debug=False, interrupt=False)
+        mock_warced_class.assert_called_once_with("test_1", harvester.warc_temp_dir, debug=False, interrupt=False,
+                                                  rollover_time=120)
         self.assertTrue(mock_warced.__enter__.called)
         self.assertTrue(mock_warced.__exit__.called)
 
@@ -346,7 +347,8 @@ class TestBaseHarvester(TestCase):
         self.assertEqual(5, harvester.harvest_seed_call_count)
         self.assertEqual(5, harvester.process_warc_call_count)
 
-        mock_warced_class.assert_called_with("test_1", harvester.warc_temp_dir, debug=False, interrupt=True)
+        mock_warced_class.assert_called_with("test_1", harvester.warc_temp_dir, debug=False, interrupt=True,
+                                             rollover_time=None)
         self.assertEqual(5, mock_warced_class.call_count)
 
         # Warcs moved
@@ -422,7 +424,8 @@ class TestBaseHarvester(TestCase):
         self.assertEqual(5, harvester.harvest_seed_call_count)
         self.assertEqual(6, harvester.process_warc_call_count)
 
-        mock_warced_class.assert_called_with("test_1", harvester.warc_temp_dir, debug=False, interrupt=True)
+        mock_warced_class.assert_called_with("test_1", harvester.warc_temp_dir, debug=False, interrupt=True,
+                                             rollover_time=None)
         self.assertEqual(5, mock_warced_class.call_count)
 
         self.assertFalse(os.path.exists(message_filepath))

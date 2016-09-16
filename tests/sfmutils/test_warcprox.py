@@ -33,16 +33,17 @@ class WarcedTest(TestCase):
     def test_generate_commandline(self):
         w = warced("test", "/test")
         self.assertEqual("warcprox -c {} --certs-dir {} --dedup-db-file /dev/null -d /test -n test -p {} -z".format(
-                          w.ca_bundle, w.ca_dir, w.port), w._generate_commandline())
+            w.ca_bundle, w.ca_dir, w.port), w._generate_commandline())
 
-        w = warced("test", "/test", compress=False, interrupt=True)
-        self.assertEqual("warcprox -c {} --certs-dir {} --dedup-db-file /dev/null -d /test -n test -p {} -i".format(
-                          w.ca_bundle, w.ca_dir, w.port), w._generate_commandline())
+        w = warced("test", "/test", compress=False, interrupt=True, rollover_time=60)
+        self.assertEqual(
+            "warcprox -c {} --certs-dir {} --dedup-db-file /dev/null -d /test -n test -p {} -i "
+            "--rollover-time 60".format(w.ca_bundle, w.ca_dir, w.port), w._generate_commandline())
 
     def test_with(self):
         warc_dir = tempfile.mkdtemp()
         try:
-            with warced("test", warc_dir) as w:
+            with warced("test", warc_dir):
                 resp = requests.get("http://www.gwu.edu")
                 self.assertEqual(200, resp.status_code)
             files = os.listdir(warc_dir)

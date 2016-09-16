@@ -70,7 +70,8 @@ class TestHarvestSupervisor(TestCase):
 command=python /opt/sfm/test_harvester.py --debug=True seed {conf_path}/test_1.json {working_path} --streaming --host test_host --username test_user --password test_password
 user={user}
 autostart=true
-autorestart=true
+autorestart=unexpected
+exitcodes=0,1
 stopwaitsecs=900
 stderr_logfile={log_path}/test_1.err.log
 stdout_logfile={log_path}/test_1.out.log

@@ -86,7 +86,8 @@ class HarvestSupervisor:
 command={python_executable} {script}{debug} seed {seed_filepath} {working_path} --streaming --host {mq_host} --username {mq_username} --password {mq_password}
 user={user}
 autostart=true
-autorestart=true
+autorestart=unexpected
+exitcodes=0,1
 stopwaitsecs=900
 stderr_logfile={log_path}/{safe_harvest_id}.err.log
 stdout_logfile={log_path}/{safe_harvest_id}.out.log

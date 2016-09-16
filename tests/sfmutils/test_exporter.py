@@ -7,6 +7,7 @@ from mock import MagicMock, patch, Mock
 import iso8601
 from sfmutils.exporter import BaseTable, BaseExporter, CODE_WARC_MISSING, CODE_NO_WARCS, CODE_BAD_REQUEST
 from sfmutils.api_client import ApiClient
+from sfmutils.warc_iter import IterItem
 import datetime
 from kombu import Producer, Connection, Exchange
 
@@ -78,7 +79,8 @@ class TestExporter(tests.TestCase):
 
         }
 
-        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, self.working_path, warc_base_path=self.warc_base_path)
+        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, self.working_path,
+                                warc_base_path=self.warc_base_path)
         exporter.mq_config = True
         exporter._producer_connection = mock_connection
         exporter.exchange = mock_exchange
@@ -88,7 +90,8 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(exclude_web=True, collection_id="005b131f5f854402afa2b08a4b7ba960",
+        mock_api_client.warcs.assert_called_once_with(exclude_web=True,
+                                                      collection_id="005b131f5f854402afa2b08a4b7ba960",
                                                       seed_ids=[], harvest_date_start=harvest_date_start,
                                                       harvest_date_end=harvest_date_end)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, True, item_datetime_start, item_datetime_end, [])
@@ -141,7 +144,8 @@ class TestExporter(tests.TestCase):
 
         }
 
-        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, self.working_path, warc_base_path=self.warc_base_path)
+        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, self.working_path,
+                                warc_base_path=self.warc_base_path)
         exporter.mq_config = True
         exporter._producer_connection = mock_connection
         exporter.exchange = mock_exchange
@@ -151,7 +155,8 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(exclude_web=True, collection_id="005b131f5f854402afa2b08a4b7ba960",
+        mock_api_client.warcs.assert_called_once_with(exclude_web=True,
+                                                      collection_id="005b131f5f854402afa2b08a4b7ba960",
                                                       seed_ids=[], harvest_date_end=None, harvest_date_start=None)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, [])
 
@@ -199,7 +204,8 @@ class TestExporter(tests.TestCase):
             "path": self.export_path,
         }
 
-        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, self.working_path, warc_base_path=self.warc_base_path)
+        exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, self.working_path,
+                                warc_base_path=self.warc_base_path)
 
         exporter.routing_key = "export.start.test.test_user"
         exporter.message = export_message
@@ -289,7 +295,8 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(exclude_web=True, collection_id="005b131f5f854402afa2b08a4b7ba960",
+        mock_api_client.warcs.assert_called_once_with(exclude_web=True,
+                                                      collection_id="005b131f5f854402afa2b08a4b7ba960",
                                                       seed_ids=[], harvest_date_end=None, harvest_date_start=None)
 
         self.assertFalse(exporter.result.success)
@@ -309,8 +316,9 @@ class TestExporter(tests.TestCase):
         mock_warc_iter_cls = MagicMock()
         mock_warc_iter = MagicMock()
         mock_warc_iter_cls.side_effect = [mock_warc_iter]
-        mock_warc_iter.iter.return_value = [(None, None, None, {"key1": "k1v1", "key2": "k2v1", "key3": "k3v1"}),
-                                            (None, None, None, {"key1": "k1v2", "key2": "k2v2", "key3": "k3v2"})]
+        mock_warc_iter.iter.return_value = [
+            IterItem(None, None, None, None, {"key1": "k1v1", "key2": "k2v1", "key3": "k3v1"}),
+            IterItem(None, None, None, None, {"key1": "k1v2", "key2": "k2v2", "key3": "k3v2"})]
 
         export_filepath = os.path.join(self.export_path, "test.json")
         now = datetime.datetime.now()
@@ -321,7 +329,8 @@ class TestExporter(tests.TestCase):
         exporter._full_json_export(self.warcs, export_filepath, True, now, None, limit_uids)
 
         mock_warc_iter_cls.assert_called_once_with(self.warcs, limit_uids)
-        mock_warc_iter.iter.assert_called_once_with(dedupe=True, item_date_start=now, item_date_end=None)
+        mock_warc_iter.iter.assert_called_once_with(dedupe=True, item_date_start=now, item_date_end=None,
+                                                    limit_item_types=None)
 
         self.assertTrue(os.path.exists(export_filepath))
         with open(export_filepath, "r") as f:
@@ -347,8 +356,9 @@ class TestBaseTable(tests.TestCase):
         mock_warc_iter_cls = MagicMock()
         mock_warc_iter = MagicMock()
         mock_warc_iter_cls.side_effect = [mock_warc_iter]
-        mock_warc_iter.iter.return_value = [(None, None, None, {"key1": "k1v1", "key2": "k2v1", "key3": "k3v1"}),
-                                            (None, None, None, {"key1": "k1v2", "key2": "k2v2", "key3": "k3v2"})]
+        mock_warc_iter.iter.return_value = [
+            IterItem(None, None, None, None, {"key1": "k1v1", "key2": "k2v1", "key3": "k3v1"}),
+            IterItem(None, None, None, None, {"key1": "k1v2", "key2": "k2v2", "key3": "k3v2"})]
         now = datetime.datetime.now()
         limit_uids = [11, 14]
 
@@ -370,4 +380,5 @@ class TestBaseTable(tests.TestCase):
         self.assertEqual(2, count)
 
         mock_warc_iter_cls.assert_called_with(self.warc_paths, limit_uids)
-        mock_warc_iter.iter.assert_called_once_with(dedupe=True, item_date_end=None, item_date_start=now)
+        mock_warc_iter.iter.assert_called_once_with(dedupe=True, item_date_end=None, item_date_start=now,
+                                                    limit_item_types=None)
