@@ -157,13 +157,15 @@ class TestBaseHarvester(TestCase):
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")
         self.assertEqual(harvest_result_message["status"], STATUS_RUNNING)
-        self.assertEqual(0, len(harvest_result_message["infos"]))
         if not is_resume:
+            self.assertEqual(0, len(harvest_result_message["infos"]))
             self.assertEqual(0, len(harvest_result_message["warnings"]))
+            self.assertEqual(0, len(harvest_result_message["errors"]))
         else:
-            self.assertEqual(1, len(harvest_result_message["warnings"]))
-            self.assertEqual(CODE_HARVEST_RESUMED, harvest_result_message["warnings"][0]["code"])
-        self.assertEqual(0, len(harvest_result_message["errors"]))
+            self.assertEqual(1, len(harvest_result_message["infos"]))
+            self.assertEqual(2, len(harvest_result_message["warnings"]))
+            self.assertEqual(CODE_HARVEST_RESUMED, harvest_result_message["warnings"][1]["code"])
+            self.assertEqual(1, len(harvest_result_message["errors"]))
         self.assertIsNotNone(iso8601.parse_date(harvest_result_message["date_started"]))
         self.assertIsNone(harvest_result_message.get("date_ended"))
         if is_resume:
@@ -186,30 +188,26 @@ class TestBaseHarvester(TestCase):
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")
         self.assertEqual(harvest_result_message["status"], STATUS_RUNNING)
-        self.assertEqual(1, len(harvest_result_message["infos"]))
-        self.assertDictEqual({
-            "code": "FAKE_CODE1",
-            "message": "This is my message."
-        }, harvest_result_message["infos"][0])
         if not is_resume:
+            self.assertEqual(1, len(harvest_result_message["infos"]))
+            self.assertDictEqual({
+                "code": "FAKE_CODE1",
+                "message": "This is my message."
+            }, harvest_result_message["infos"][0])
             self.assertEqual(1, len(harvest_result_message["warnings"]))
             self.assertDictEqual({
                 "code": "FAKE_CODE2",
                 "message": "This is my warning."
             }, harvest_result_message["warnings"][0])
-        else:
-            self.assertEqual(2, len(harvest_result_message["warnings"]))
-            self.assertEqual(CODE_HARVEST_RESUMED, harvest_result_message["warnings"][0]["code"])
+            self.assertEqual(1, len(harvest_result_message["errors"]))
             self.assertDictEqual({
-                "code": "FAKE_CODE2",
-                "message": "This is my warning."
-            }, harvest_result_message["warnings"][1])
-
-        self.assertEqual(1, len(harvest_result_message["errors"]))
-        self.assertDictEqual({
-            "code": "FAKE_CODE3",
-            "message": "This is my error."
-        }, harvest_result_message["errors"][0])
+                "code": "FAKE_CODE3",
+                "message": "This is my error."
+            }, harvest_result_message["errors"][0])
+        else:
+            self.assertEqual(2, len(harvest_result_message["infos"]))
+            self.assertEqual(3, len(harvest_result_message["warnings"]))
+            self.assertEqual(2, len(harvest_result_message["errors"]))
         self.assertIsNotNone(iso8601.parse_date(harvest_result_message["date_started"]))
         self.assertIsNone(harvest_result_message.get("date_ended"))
         self.assertDictEqual({
@@ -235,9 +233,14 @@ class TestBaseHarvester(TestCase):
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")
         self.assertEqual(harvest_result_message["status"], STATUS_RUNNING)
-        self.assertEqual(0, len(harvest_result_message["infos"]))
-        self.assertEqual(0, len(harvest_result_message["warnings"]))
-        self.assertEqual(0, len(harvest_result_message["errors"]))
+        if not is_resume:
+            self.assertEqual(1, len(harvest_result_message["infos"]))
+            self.assertEqual(1, len(harvest_result_message["warnings"]))
+            self.assertEqual(1, len(harvest_result_message["errors"]))
+        else:
+            self.assertEqual(2, len(harvest_result_message["infos"]))
+            self.assertEqual(3, len(harvest_result_message["warnings"]))
+            self.assertEqual(2, len(harvest_result_message["errors"]))
         self.assertIsNotNone(iso8601.parse_date(harvest_result_message["date_started"]))
         self.assertIsNone(harvest_result_message.get("date_ended"))
         self.assertDictEqual({}, harvest_result_message["token_updates"])
@@ -259,9 +262,14 @@ class TestBaseHarvester(TestCase):
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")
         self.assertEqual(harvest_result_message["status"], STATUS_SUCCESS)
-        self.assertEqual(0, len(harvest_result_message["infos"]))
-        self.assertEqual(0, len(harvest_result_message["warnings"]))
-        self.assertEqual(0, len(harvest_result_message["errors"]))
+        if not is_resume:
+            self.assertEqual(1, len(harvest_result_message["infos"]))
+            self.assertEqual(1, len(harvest_result_message["warnings"]))
+            self.assertEqual(1, len(harvest_result_message["errors"]))
+        else:
+            self.assertEqual(2, len(harvest_result_message["infos"]))
+            self.assertEqual(3, len(harvest_result_message["warnings"]))
+            self.assertEqual(2, len(harvest_result_message["errors"]))
         self.assertIsNotNone(iso8601.parse_date(harvest_result_message["date_started"]))
         self.assertIsNotNone(iso8601.parse_date(harvest_result_message["date_ended"]))
         self.assertDictEqual({}, harvest_result_message["token_updates"])
@@ -418,7 +426,10 @@ class TestBaseHarvester(TestCase):
                 "warcs": ["warc1.warc.gz", "warc2.warc.gz"],
                 "warc_bytes": 18,
                 "stats": [[yesterday.isoformat(), {"stuff": 10}]],
-                "started": yesterday.isoformat()
+                "started": yesterday.isoformat(),
+                "infos": [{"code": "FAKE_CODE1", "message": "This is my previous message."}],
+                "warnings": [{"code": "FAKE_CODE2", "message": "This is my previous warning."}],
+                "errors": [{"code": "FAKE_CODE3", "message": "This is my previous error."}]
             }, f)
 
         # Invoke harvest_from_file

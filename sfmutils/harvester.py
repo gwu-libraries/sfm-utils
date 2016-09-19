@@ -155,16 +155,18 @@ class BaseHarvester(BaseConsumer):
 
         # Possibly resume a harvest
         self.result = HarvestResult()
+
         if os.path.exists(self.result_filepath) or len(self._list_warcs(self.warc_temp_dir)) > 0:
             self._load_result()
             self.result.warnings.append(
                 Msg(CODE_HARVEST_RESUMED, "Harvest resumed on {}".format(datetime.datetime.now())))
+            # Send a status message. This will give immediate indication that harvesting is occurring.
+            self._send_status_message(STATUS_RUNNING)
             self._queue_warc_files()
         else:
             self.result.started = datetime.datetime.now()
-
-        # Send a status message. This will give immediate indication that harvesting is occurring.
-        self._send_status_message(STATUS_RUNNING)
+            # Send a status message. This will give immediate indication that harvesting is occurring.
+            self._send_status_message(STATUS_RUNNING)
 
         # stop_harvest_loop_event tells the harvester to stop looping.
         # Only streaming harvesters loop.
@@ -408,7 +410,11 @@ class BaseHarvester(BaseConsumer):
             "warcs": self.result.warcs,
             "warc_bytes": self.result.warc_bytes,
             "stats": [],
-            "started": self.result.started.isoformat()
+            "started": self.result.started.isoformat(),
+            "infos": [msg.to_map() for msg in self.result.infos],
+            "warnings": [msg.to_map() for msg in self.result.warnings],
+            "errors": [msg.to_map() for msg in self.result.errors]
+
         }
 
         for day, stats in self.result.stats().items():
@@ -424,10 +430,13 @@ class BaseHarvester(BaseConsumer):
             log.info("Resuming from previous results")
             with codecs.open(self.result_filepath, 'r') as f:
                 result_message = json.load(f)
-
+            log.debug("Previous results: {}".format(json.dumps(result_message, indent=4)))
             self.result.warcs = result_message["warcs"]
             self.result.warc_bytes = result_message["warc_bytes"]
             self.result.started = iso8601.parse_date(result_message["started"])
+            self.result.infos = list([Msg(msg["code"], msg["message"]) for msg in result_message["infos"]])
+            self.result.warnings = list([Msg(msg["code"], msg["message"]) for msg in result_message["warnings"]])
+            self.result.errors = list([Msg(msg["code"], msg["message"]) for msg in result_message["errors"]])
 
             for day, stats in result_message["stats"]:
                 for item, count in stats.items():
@@ -477,9 +486,6 @@ class BaseHarvester(BaseConsumer):
                 self._send_status_message(STATUS_RUNNING)
 
                 # Since these were sent, clear them.
-                self.result.errors = []
-                self.result.infos = []
-                self.result.warnings = []
                 self.result.token_updates = {}
                 self.result.uids = {}
 

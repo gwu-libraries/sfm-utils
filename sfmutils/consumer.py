@@ -2,7 +2,6 @@ import logging
 from kombu import Connection, Queue, Exchange, Producer
 from kombu.mixins import ConsumerMixin
 import json
-import tempfile
 import os
 import codecs
 
