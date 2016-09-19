@@ -23,7 +23,7 @@ class StreamConsumer(BaseConsumer):
 
     Logs for the supervisor processes are in /var/log/sfm.
     """
-    def __init__(self, script, working_path, debug=False, mq_config=None):
+    def __init__(self, script, working_path, debug=False, mq_config=None, debug_warcprox=False):
         BaseConsumer.__init__(self, working_path=working_path, mq_config=mq_config)
         # Add routing keys for harvest stop messages
         # The queue will be unique to this instance of StreamServer so that it
@@ -36,6 +36,7 @@ class StreamConsumer(BaseConsumer):
 
         self.message = None
         self.debug = debug
+        self.debug_warcprox = debug_warcprox
         self._supervisor = HarvestSupervisor(script, mq_config.host, mq_config.username, mq_config.password,
                                              working_path, debug=debug)
 
@@ -45,7 +46,7 @@ class StreamConsumer(BaseConsumer):
             # Start
             log.info("Starting %s", harvest_id)
             log.debug("Message for %s is %s", harvest_id, json.dumps(self.message, indent=4))
-            self._supervisor.start(self.message, self.routing_key)
+            self._supervisor.start(self.message, self.routing_key, debug=self.debug, debug_warcprox=self.debug_warcprox)
         else:
             # Stop
             log.info("Stopping %s", harvest_id)
@@ -63,6 +64,8 @@ if __name__ == "__main__":
     parser.add_argument("working_path")
     parser.add_argument("--debug", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
                         default="False", const="True")
+    parser.add_argument("--debug-warcprox", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
+                        default="False", const="True")
 
     args = parser.parse_args()
 
@@ -76,5 +79,5 @@ if __name__ == "__main__":
                                                  args.password,
                                                  EXCHANGE,
                                                  {args.queue: args.routing_keys.split(",")}),
-                              debug=args.debug)
+                              debug=args.debug, debug_warcprox=args.debug_warcprox)
     consumer.run()

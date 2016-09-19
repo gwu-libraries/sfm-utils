@@ -81,6 +81,10 @@ class TestableHarvester(BaseHarvester):
         if self.shutdown_on_count == self.harvest_seed_call_count:
             self.stop_harvest_loop_event.set()
             self.stop_harvest_seeds_event.set()
+            if self.restart_stream_timer:
+                self.restart_stream_timer.cancel()
+            if self.queue_warc_files_timer:
+                self.queue_warc_files_timer.cancel()
 
     def process_warc(self, warc_filepath):
         self.process_warc_call_count += 1
@@ -420,7 +424,7 @@ class TestBaseHarvester(TestCase):
         # Invoke harvest_from_file
         harvester.harvest_from_file(message_filepath, is_streaming=True, delete=True)
 
-        # Test assertions
+        # # Test assertions
         self.assertEqual(5, harvester.harvest_seed_call_count)
         self.assertEqual(6, harvester.process_warc_call_count)
 

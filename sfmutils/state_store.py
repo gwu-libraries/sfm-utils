@@ -96,7 +96,7 @@ class JsonHarvestStateStore(DictHarvestStateStore):
         shutil.move(self.state_tmp_filepath, self.state_filepath)
 
 
-class NullHarvestStateStore():
+class NullHarvestStateStore:
     """
     A harvest state store that does nothing.
     """
@@ -111,7 +111,7 @@ class NullHarvestStateStore():
         pass
 
 
-class DelayedSetStateStoreAdapter():
+class DelayedSetStateStoreAdapter:
     """
     An adapter for a state store that keeps track of sets and delays
     passing them on the the underlying state store.

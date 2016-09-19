@@ -181,7 +181,6 @@ class BaseConsumer(ConsumerProducerMixin):
         if delete:
             os.remove(self.message_filepath)
             log.debug("Deleted %s", self.message_filepath)
-
         if self.result is not None:
             return self.result
 

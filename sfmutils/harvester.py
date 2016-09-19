@@ -15,7 +15,7 @@ import codecs
 import uuid
 import iso8601
 from datetime import date
-from Queue import Queue
+from Queue import Queue, Empty
 
 from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
 from sfmutils.state_store import JsonHarvestStateStore, DelayedSetStateStoreAdapter
@@ -117,7 +117,8 @@ class BaseHarvester(BaseConsumer):
     """
 
     def __init__(self, working_path, mq_config=None, stream_restart_interval_secs=30 * 60, debug=False,
-                 use_warcprox=True, queue_warc_files_interval_secs=5 * 60, warc_rollover_secs=30 * 60):
+                 use_warcprox=True, queue_warc_files_interval_secs=5 * 60, warc_rollover_secs=30 * 60,
+                 debug_warcprox=False):
         BaseConsumer.__init__(self, working_path=working_path, mq_config=mq_config, persist_messages=True)
         self.stream_restart_interval_secs = stream_restart_interval_secs
         self.is_streaming = False
@@ -128,6 +129,7 @@ class BaseHarvester(BaseConsumer):
         self.restart_stream_timer = None
         self.state_store = None
         self.debug = debug
+        self.debug_warcprox = debug_warcprox
         self.use_warcprox = use_warcprox
         self.warc_processing_queue = Queue()
         self.result_filepath = None
@@ -136,7 +138,7 @@ class BaseHarvester(BaseConsumer):
         self.warc_rollover_secs = warc_rollover_secs
 
         # Create and start warc processing thread.
-        self.warc_processing_thread = threading.Thread(target=self._process_warc_thread)
+        self.warc_processing_thread = threading.Thread(target=self._process_warc_thread, name="warc_processing_thread")
         self.warc_processing_thread.daemon = True
         self.warc_processing_thread.start()
 
@@ -155,9 +157,9 @@ class BaseHarvester(BaseConsumer):
         self.result = HarvestResult()
         if os.path.exists(self.result_filepath) or len(self._list_warcs(self.warc_temp_dir)) > 0:
             self._load_result()
-            self._queue_warc_files()
             self.result.warnings.append(
                 Msg(CODE_HARVEST_RESUMED, "Harvest resumed on {}".format(datetime.datetime.now())))
+            self._queue_warc_files()
         else:
             self.result.started = datetime.datetime.now()
 
@@ -210,7 +212,7 @@ class BaseHarvester(BaseConsumer):
             # Here is where the harvesting happens.
             try:
                 if self.use_warcprox:
-                    with warced(safe_string(self.message["id"]), self.warc_temp_dir, debug=self.debug,
+                    with warced(safe_string(self.message["id"]), self.warc_temp_dir, debug=self.debug_warcprox,
                                 interrupt=self.is_streaming,
                                 rollover_time=self.warc_rollover_secs if not self.is_streaming else None):
                         self.harvest_seeds()
@@ -269,8 +271,9 @@ class BaseHarvester(BaseConsumer):
             self.warc_processing_queue.put(warc_filename)
 
         # Restart the timer
-        self.queue_warc_files_timer = threading.Timer(self.queue_warc_files_interval_secs, self._queue_warc_files)
-        self.queue_warc_files_timer.start()
+        if self.queue_warc_files_timer:
+            self.queue_warc_files_timer = threading.Timer(self.queue_warc_files_interval_secs, self._queue_warc_files)
+            self.queue_warc_files_timer.start()
 
     def harvest_from_file(self, filepath, is_streaming=False, delete=False):
         """
@@ -435,7 +438,10 @@ class BaseHarvester(BaseConsumer):
         # This will continue until harvester is killed.
         while True:
             # This will block
-            warc_filename = self.warc_processing_queue.get()
+            try:
+                warc_filename = self.warc_processing_queue.get(timeout=1)
+            except Empty:
+                continue
             # Make sure file exists. Possible that same file will be put in queue multiple times.
             warc_filepath = os.path.join(self.warc_temp_dir, warc_filename)
             if os.path.exists(warc_filepath):
@@ -484,6 +490,7 @@ class BaseHarvester(BaseConsumer):
                 log.debug("Skipping processing %s", warc_filename)
             # Mark this as done.
             self.warc_processing_queue.task_done()
+        log.debug("Exiting warc processing thread")
 
     def process_warc(self, warc_filepath):
         """
@@ -519,6 +526,8 @@ class BaseHarvester(BaseConsumer):
                             default="False", const="True")
         parser.add_argument("--debug-http", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
                             default="False", const="True")
+        parser.add_argument("--debug-warcprox", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
+                            default="False", const="True")
 
         subparsers = parser.add_subparsers(dest="command")
 
@@ -549,14 +558,16 @@ class BaseHarvester(BaseConsumer):
 
         if args.command == "service":
             harvester = cls(args.working_path, mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE,
-                                                                  {queue: routing_keys}), debug=args.debug)
+                                                                  {queue: routing_keys}),
+                            debug=args.debug, debug_warcprox=args.debug_warcprox)
             if not args.skip_resume:
                 harvester.resume_from_file()
             harvester.run()
         elif args.command == "seed":
             mq_config = MqConfig(args.host, args.username, args.password, EXCHANGE, None) \
                 if args.host and args.username and args.password else None
-            harvester = cls(args.working_path, mq_config=mq_config, debug=args.debug)
+            harvester = cls(args.working_path, mq_config=mq_config, debug=args.debug,
+                            debug_warcprox=args.debug_warcprox)
             harvester.harvest_from_file(args.filepath, is_streaming=args.streaming)
             if __name__ == '__main__':
                 if harvester.result:

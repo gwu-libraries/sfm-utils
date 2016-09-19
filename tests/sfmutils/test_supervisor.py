@@ -56,7 +56,7 @@ class TestHarvestSupervisor(TestCase):
         self.assertFalse(os.listdir(conf_path))
 
         # Start (which calls stop first)
-        supervisor.start(message, "harvest.start.test.test_search")
+        supervisor.start(message, "harvest.start.test.test_search", debug=False, debug_warcprox=True)
 
         # Seed file contains message.
         with open(os.path.join(conf_path, "test_1.json")) as f:
@@ -67,7 +67,7 @@ class TestHarvestSupervisor(TestCase):
         with open(os.path.join(conf_path, "test_1.conf")) as f:
             conf = f.read()
         self.assertEqual("""[program:test_1]
-command=python /opt/sfm/test_harvester.py --debug=True seed {conf_path}/test_1.json {working_path} --streaming --host test_host --username test_user --password test_password
+command=python /opt/sfm/test_harvester.py --debug=False --debug-warcprox=True seed {conf_path}/test_1.json {working_path} --streaming --host test_host --username test_user --password test_password
 user={user}
 autostart=true
 autorestart=unexpected
