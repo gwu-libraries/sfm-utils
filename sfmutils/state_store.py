@@ -19,8 +19,9 @@ class DictHarvestStateStore:
     """
     A harvest state store implementation backed by a dictionary and not persisted.
     """
-    def __init__(self):
+    def __init__(self, verbose=True):
         self.state = {}
+        self.verbose = verbose
 
     def get_state(self, resource_type, key):
         """
@@ -45,7 +46,8 @@ class DictHarvestStateStore:
         :param key: Key for the state that is being stored.
         :param value: Value for the state that is being stored.  None to delete an existing value.
         """
-        log.debug("Setting state for %s with key %s to %s", resource_type, key, value)
+        if self.verbose:
+            log.debug("Setting state for %s with key %s to %s", resource_type, key, value)
         if value is not None:
             if resource_type not in self.state:
                 self.state[resource_type] = {}
@@ -116,7 +118,7 @@ class DelayedSetStateStoreAdapter():
     """
     def __init__(self, state_store):
         self.state_store = state_store
-        self.delayed_state = DictHarvestStateStore()
+        self.delayed_state = DictHarvestStateStore(verbose=False)
 
     def get_state(self, resource_type, key):
         return self.delayed_state.get_state(resource_type, key) or self.state_store.get_state(resource_type, key)
