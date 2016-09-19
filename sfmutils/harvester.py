@@ -118,7 +118,7 @@ class BaseHarvester(BaseConsumer):
 
     def __init__(self, working_path, mq_config=None, stream_restart_interval_secs=30 * 60, debug=False,
                  use_warcprox=True, queue_warc_files_interval_secs=5 * 60, warc_rollover_secs=30 * 60,
-                 debug_warcprox=False):
+                 debug_warcprox=False, tries=3):
         BaseConsumer.__init__(self, working_path=working_path, mq_config=mq_config, persist_messages=True)
         self.stream_restart_interval_secs = stream_restart_interval_secs
         self.is_streaming = False
@@ -136,6 +136,7 @@ class BaseHarvester(BaseConsumer):
         self.queue_warc_files_interval_secs = queue_warc_files_interval_secs
         self.queue_warc_files_timer = None
         self.warc_rollover_secs = warc_rollover_secs
+        self.tries = tries
 
         # Create and start warc processing thread.
         self.warc_processing_thread = threading.Thread(target=self._process_warc_thread, name="warc_processing_thread")
@@ -212,20 +213,39 @@ class BaseHarvester(BaseConsumer):
                 self.stop_harvest_loop_event.set()
 
             # Here is where the harvesting happens.
-            try:
-                if self.use_warcprox:
-                    with warced(safe_string(self.message["id"]), self.warc_temp_dir, debug=self.debug_warcprox,
-                                interrupt=self.is_streaming,
-                                rollover_time=self.warc_rollover_secs if not self.is_streaming else None):
+            try_count = 0
+            done = False
+            while not done:
+                try_count += 1
+                log.debug("Try {} of {}".format(try_count, self.tries))
+                try:
+                    if self.use_warcprox:
+                        with warced(safe_string(self.message["id"]), self.warc_temp_dir, debug=self.debug_warcprox,
+                                    interrupt=self.is_streaming,
+                                    rollover_time=self.warc_rollover_secs if not self.is_streaming else None):
+                            self.harvest_seeds()
+                    else:
                         self.harvest_seeds()
-                else:
-                    self.harvest_seeds()
-                log.debug("Exited harvesting seeds.")
-            except Exception as e:
-                log.exception("Unknown error raised during harvest")
-                self.result.success = False
-                self.result.errors.append(Msg(CODE_UNKNOWN_ERROR, str(e)))
-                self.stop_harvest_loop_event.set()
+                    done = True
+                    log.debug("Done harvesting seeds.")
+                except Exception as e:
+                    log.exception("Unknown error raised during harvest: %s", e)
+                    if try_count == self.tries:
+                        # Give up trying
+                        log.debug("Too many retries, so giving up on harvesting seeds.")
+                        done = True
+                        self.result.success = False
+                        self.result.errors.append(Msg(CODE_UNKNOWN_ERROR, str(e)))
+                        self.stop_harvest_loop_event.set()
+                    else:
+                        # Retry
+                        # Queue any WARC files
+                        self._queue_warc_files()
+                        # Wait for any WARC files to be processed
+                        log.debug("Waiting for processing to complete.")
+                        self.warc_processing_queue.join()
+                        log.debug("Processing complete.")
+
             # Queue any WARC files
             self._queue_warc_files()
 
@@ -544,6 +564,7 @@ class BaseHarvester(BaseConsumer):
         service_parser.add_argument("password")
         service_parser.add_argument("working_path")
         service_parser.add_argument("--skip-resume", action="store_true")
+        service_parser.add_argument("--tries", type=int, default="3", help="Number of times to try harvests if errors.")
 
         seed_parser = subparsers.add_parser("seed", help="Harvest based on a seed file.")
         seed_parser.add_argument("filepath", help="Filepath of the seed file.")
@@ -552,6 +573,7 @@ class BaseHarvester(BaseConsumer):
         seed_parser.add_argument("--host")
         seed_parser.add_argument("--username")
         seed_parser.add_argument("--password")
+        seed_parser.add_argument("--tries", type=int, default="3", help="Number of times to try harvests if errors.")
 
         args = parser.parse_args()
 
@@ -565,7 +587,7 @@ class BaseHarvester(BaseConsumer):
         if args.command == "service":
             harvester = cls(args.working_path, mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE,
                                                                   {queue: routing_keys}),
-                            debug=args.debug, debug_warcprox=args.debug_warcprox)
+                            debug=args.debug, debug_warcprox=args.debug_warcprox, tries=args.tries)
             if not args.skip_resume:
                 harvester.resume_from_file()
             harvester.run()
@@ -573,7 +595,7 @@ class BaseHarvester(BaseConsumer):
             mq_config = MqConfig(args.host, args.username, args.password, EXCHANGE, None) \
                 if args.host and args.username and args.password else None
             harvester = cls(args.working_path, mq_config=mq_config, debug=args.debug,
-                            debug_warcprox=args.debug_warcprox)
+                            debug_warcprox=args.debug_warcprox, tries=args.tries)
             harvester.harvest_from_file(args.filepath, is_streaming=args.streaming)
             if __name__ == '__main__':
                 if harvester.result:

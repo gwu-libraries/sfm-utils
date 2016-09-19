@@ -40,7 +40,7 @@ class HarvestSupervisor:
             log.debug("Creating %s", self.log_path)
             os.makedirs(self.log_path)
 
-    def start(self, harvest_start_message, routing_key, debug=False, debug_warcprox=False):
+    def start(self, harvest_start_message, routing_key, debug=False, debug_warcprox=False, tries=3):
         log.info("Starting %s: %s", routing_key, harvest_start_message)
         harvest_id = harvest_start_message["id"]
 
@@ -55,7 +55,7 @@ class HarvestSupervisor:
             }, f)
 
         # Create conf file
-        self._create_conf_file(harvest_id, debug, debug_warcprox)
+        self._create_conf_file(harvest_id, debug, debug_warcprox, tries)
 
         time.sleep(1)
         self._reload_config()
@@ -79,11 +79,11 @@ class HarvestSupervisor:
             log.debug("Deleting seed %s", seed_filepath)
             os.remove(seed_filepath)
 
-    def _create_conf_file(self, harvest_id, debug, debug_warcprox):
+    def _create_conf_file(self, harvest_id, debug, debug_warcprox, tries):
         # Note that giving a long time to shutdown.
         # Stream harvester may need to finish processing.
         contents = """[program:{process_group}]
-command={python_executable} {script} --debug={debug} --debug-warcprox={debug_warcprox} seed {seed_filepath} {working_path} --streaming --host {mq_host} --username {mq_username} --password {mq_password}
+command={python_executable} {script} --debug={debug} --debug-warcprox={debug_warcprox} seed {seed_filepath} {working_path} --streaming --host {mq_host} --username {mq_username} --password {mq_password} --tries {tries}
 user={user}
 autostart=true
 autorestart=unexpected
@@ -103,7 +103,8 @@ stdout_logfile={log_path}/{safe_harvest_id}.out.log
            user=self.process_owner,
            log_path=self.log_path,
            debug=debug,
-           debug_warcprox=debug_warcprox)
+           debug_warcprox=debug_warcprox,
+           tries=tries)
 
         # Write the file
         conf_filepath = self._get_conf_filepath(harvest_id)

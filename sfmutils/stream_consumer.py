@@ -23,7 +23,8 @@ class StreamConsumer(BaseConsumer):
 
     Logs for the supervisor processes are in /var/log/sfm.
     """
-    def __init__(self, script, working_path, debug=False, mq_config=None, debug_warcprox=False):
+
+    def __init__(self, script, working_path, debug=False, mq_config=None, debug_warcprox=False, tries=3):
         BaseConsumer.__init__(self, working_path=working_path, mq_config=mq_config)
         # Add routing keys for harvest stop messages
         # The queue will be unique to this instance of StreamServer so that it
@@ -37,6 +38,7 @@ class StreamConsumer(BaseConsumer):
         self.message = None
         self.debug = debug
         self.debug_warcprox = debug_warcprox
+        self.tries = tries
         self._supervisor = HarvestSupervisor(script, mq_config.host, mq_config.username, mq_config.password,
                                              working_path, debug=debug)
 
@@ -46,11 +48,13 @@ class StreamConsumer(BaseConsumer):
             # Start
             log.info("Starting %s", harvest_id)
             log.debug("Message for %s is %s", harvest_id, json.dumps(self.message, indent=4))
-            self._supervisor.start(self.message, self.routing_key, debug=self.debug, debug_warcprox=self.debug_warcprox)
+            self._supervisor.start(self.message, self.routing_key, debug=self.debug, debug_warcprox=self.debug_warcprox,
+                                   tries=self.tries)
         else:
             # Stop
             log.info("Stopping %s", harvest_id)
             self._supervisor.stop(harvest_id)
+
 
 if __name__ == "__main__":
     # Arguments
@@ -66,6 +70,7 @@ if __name__ == "__main__":
                         default="False", const="True")
     parser.add_argument("--debug-warcprox", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
                         default="False", const="True")
+    parser.add_argument("--tries", type=int, default="3", help="Number of times to try harvests if errors.")
 
     args = parser.parse_args()
 
@@ -79,5 +84,5 @@ if __name__ == "__main__":
                                                  args.password,
                                                  EXCHANGE,
                                                  {args.queue: args.routing_keys.split(",")}),
-                              debug=args.debug, debug_warcprox=args.debug_warcprox)
+                              debug=args.debug, debug_warcprox=args.debug_warcprox, tries=args.tries)
     consumer.run()
