@@ -43,7 +43,7 @@ def write_message_file(message):
 
 
 class TestableHarvester(BaseHarvester):
-    def __init__(self, working_path, connection=None, exchange=None, raise_exception_on_count=[0], shutdown_on_count=0,
+    def __init__(self, working_path, connection=None, exchange=None, raise_exception_on_count=(0,), shutdown_on_count=0,
                  tries=1):
         BaseHarvester.__init__(self, working_path, stream_restart_interval_secs=5, warc_rollover_secs=120, tries=tries)
         if connection:
@@ -111,6 +111,9 @@ class TestBaseHarvester(TestCase):
             "path": self.harvest_path,
             "collection_set": {
                 "id": "test_collection_set"
+            },
+            "collection": {
+                "id": "test_collection"
             }
         }
 
@@ -132,6 +135,7 @@ class TestBaseHarvester(TestCase):
         self.assertEqual(warc_created_message["harvest"]["id"], "test:1")
         self.assertEqual(warc_created_message["harvest"]["type"], "test_type")
         self.assertEqual(warc_created_message["collection_set"]["id"], "test_collection_set")
+        self.assertEqual(warc_created_message["collection"]["id"], "test_collection")
         self.assertEqual(warc_created_message["warc"]["path"],
                          os.path.join(self.harvest_path,
                                       "2015/11/09/19", WARC_FILENAME_TEMPLATE.format(warc_number)))
@@ -150,6 +154,7 @@ class TestBaseHarvester(TestCase):
         self.assertEqual("web", web_harvest_message["type"])
         self.assertEqual(warc_number, len(web_harvest_message["seeds"]))
         self.assertEqual("test_collection_set", web_harvest_message["collection_set"]["id"])
+        self.assertEqual("test_collection", web_harvest_message["collection"]["id"])
         self.assertEqual(self.harvest_path, web_harvest_message["path"])
 
     def assert_first_running_harvest_status(self, name, _, kwargs, is_resume=False):
