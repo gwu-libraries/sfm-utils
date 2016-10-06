@@ -1,6 +1,5 @@
 from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
 from sfmutils.api_client import ApiClient
-from sfmutils.harvester import Msg, STATUS_SUCCESS, STATUS_FAILURE
 import logging
 import os
 import json
@@ -15,7 +14,8 @@ import argparse
 import sys
 import shutil
 import tempfile
-from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE
+import re
+from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class ExportResult(BaseResult):
 
 class BaseExporter(BaseConsumer):
     def __init__(self, api_base_url, warc_iter_cls, table_cls, working_path, mq_config=None, warc_base_path=None,
-                 limit_item_types=None):
+                 limit_item_types=None, host=os.environ.get("HOSTNAME")):
         BaseConsumer.__init__(self, mq_config=mq_config, working_path=working_path, persist_messages=True)
         self.api_client = ApiClient(api_base_url)
         self.warc_iter_cls = warc_iter_cls
@@ -47,6 +47,8 @@ class BaseExporter(BaseConsumer):
         self.limit_item_types = limit_item_types
         # This is for unit tests only.
         self.warc_base_path = warc_base_path
+        assert host
+        self.host = host
 
     def on_message(self):
         assert self.message
@@ -56,6 +58,9 @@ class BaseExporter(BaseConsumer):
 
         self.result = ExportResult()
         self.result.started = datetime.datetime.now()
+
+        # Send status indicating that it is running
+        self._send_response_message(STATUS_RUNNING, self.routing_key, export_id, self.result)
 
         # Get the WARCs from the API
         collection_id = self.message.get("collection", {}).get("id")
@@ -130,7 +135,8 @@ class BaseExporter(BaseConsumer):
             self.result.success = False
 
         self.result.ended = datetime.datetime.now()
-        self._send_response_message(self.routing_key, export_id, self.result)
+        self._send_response_message(STATUS_SUCCESS if self.result.success else STATUS_FAILURE, self.routing_key,
+                                    export_id, self.result)
 
     @staticmethod
     def _file_fix(filepath, prefix=None, suffix=None):
@@ -173,15 +179,19 @@ class BaseExporter(BaseConsumer):
         log.debug("Warcs are %s", warc_paths)
         return warc_paths
 
-    def _send_response_message(self, export_request_routing_key, export_id, export_result):
+    def _send_response_message(self, status, export_request_routing_key, export_id, export_result):
         # Just add additional info to job message
         message = {
             "id": export_id,
-            "status": STATUS_SUCCESS if export_result.success else STATUS_FAILURE,
+            "status": status,
             "infos": [msg.to_map() for msg in export_result.infos],
             "warnings": [msg.to_map() for msg in export_result.warnings],
             "errors": [msg.to_map() for msg in export_result.errors],
             "date_started": export_result.started.isoformat(),
+            # This will add spaces before caps
+            "service": re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', self.__class__.__name__),
+            "host": self.host,
+            "instance": str(os.getpid())
         }
 
         if export_result.ended:
