@@ -16,8 +16,8 @@ setup(
                       'supervisor>=3.2.0',
                       'urllib3>=1.12',
                       'warc>=0.2.1',
-                      'petl>=1.1.0',
-                      'openpyxl>=2.3.3',
+                      'petl==1.1.0',
+                      'openpyxl==2.3.3',
                       'iso8601>=0.1.11'],
     tests_require=['mock>=1.3.0'],
     classifiers=[
