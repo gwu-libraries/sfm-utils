@@ -291,13 +291,19 @@ class BaseTable(petl.Table):
             except KeyError, e:
                 log.warn("Invalid key %s in %s", e.message, json.dumps(item, indent=4))
 
+class DateEncoder(JSONEncoder):
+     def default(self, obj):
+         if hasattr(obj, 'isoformat'):
+             return obj.isoformat()
+         # Let the base class default method deal with others
+         return JSONEncoder.default(self, obj)
 
 def to_lineoriented_json(table, source):
     """
     Function to enabling PETL support for exporting line-oriented JSON.
     """
     source = write_source_from_arg(source)
-    encoder = JSONEncoder()
+    encoder = DateEncoder()
     with source.open("wb") as f:
         for d in _dicts(table):
             for chunk in encoder.iterencode(d):
