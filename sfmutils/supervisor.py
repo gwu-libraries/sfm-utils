@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 
 class HarvestSupervisor:
-    def __init__(self, script, mq_host, mq_username, mq_password,
+    def __init__(self, script, mq_host, mq_username, mq_password, working_path,
                  process_owner=None, python_executable="python", log_path="/var/log/sfm",
                  conf_path="/etc/supervisor/conf.d", internal_ip="127.0.0.1", socket_file="/var/run/supervisor.sock",
                  debug=False):
@@ -24,6 +24,7 @@ class HarvestSupervisor:
         self.mq_host = mq_host
         self.mq_username = mq_username
         self.mq_password = mq_password
+        self.working_path = working_path
         self.log_path = log_path
         self.internal_ip = internal_ip
         self.socket_file = socket_file
@@ -39,7 +40,7 @@ class HarvestSupervisor:
             log.debug("Creating %s", self.log_path)
             os.makedirs(self.log_path)
 
-    def start(self, harvest_start_message, routing_key):
+    def start(self, harvest_start_message, routing_key, debug=False, debug_warcprox=False, tries=3):
         log.info("Starting %s: %s", routing_key, harvest_start_message)
         harvest_id = harvest_start_message["id"]
 
@@ -48,10 +49,13 @@ class HarvestSupervisor:
 
         # Write seed file
         with open(self._get_seed_filepath(harvest_id), 'w') as f:
-            json.dump(harvest_start_message, f)
+            json.dump({
+                "routing_key": routing_key,
+                "message": harvest_start_message
+            }, f)
 
         # Create conf file
-        self._create_conf_file(harvest_id, routing_key, )
+        self._create_conf_file(harvest_id, debug, debug_warcprox, tries)
 
         time.sleep(1)
         self._reload_config()
@@ -75,12 +79,16 @@ class HarvestSupervisor:
             log.debug("Deleting seed %s", seed_filepath)
             os.remove(seed_filepath)
 
-    def _create_conf_file(self, harvest_id, routing_key):
+    def _create_conf_file(self, harvest_id, debug, debug_warcprox, tries):
+        # Note that giving a long time to shutdown.
+        # Stream harvester may need to finish processing.
         contents = """[program:{process_group}]
-command={python_executable} {script}{debug} seed {seed_filepath} --streaming --host {mq_host} --username {mq_username} --password {mq_password} --routing-key {routing_key}
+command={python_executable} {script} --debug={debug} --debug-warcprox={debug_warcprox} seed {seed_filepath} {working_path} --streaming --host {mq_host} --username {mq_username} --password {mq_password} --tries {tries}
 user={user}
 autostart=true
-autorestart=true
+autorestart=unexpected
+exitcodes=0,1
+stopwaitsecs=900
 stderr_logfile={log_path}/{safe_harvest_id}.err.log
 stdout_logfile={log_path}/{safe_harvest_id}.out.log
 """.format(process_group=self._get_process_group(harvest_id),
@@ -88,13 +96,15 @@ stdout_logfile={log_path}/{safe_harvest_id}.out.log
            python_executable=self.python_executable,
            script=self.script,
            seed_filepath=self._get_seed_filepath(harvest_id),
+           working_path=self.working_path,
            mq_host=self.mq_host,
            mq_username=self.mq_username,
            mq_password=self.mq_password,
-           routing_key=routing_key,
            user=self.process_owner,
            log_path=self.log_path,
-           debug=" --debug=True" if self.debug else "")
+           debug=debug,
+           debug_warcprox=debug_warcprox,
+           tries=tries)
 
         # Write the file
         conf_filepath = self._get_conf_filepath(harvest_id)

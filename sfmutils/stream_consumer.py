@@ -23,8 +23,9 @@ class StreamConsumer(BaseConsumer):
 
     Logs for the supervisor processes are in /var/log/sfm.
     """
-    def __init__(self, script, debug=False, mq_config=None):
-        BaseConsumer.__init__(self, mq_config=mq_config)
+
+    def __init__(self, script, working_path, debug=False, mq_config=None, debug_warcprox=False, tries=3):
+        BaseConsumer.__init__(self, working_path=working_path, mq_config=mq_config)
         # Add routing keys for harvest stop messages
         # The queue will be unique to this instance of StreamServer so that it
         # will receive all stop requests
@@ -36,8 +37,10 @@ class StreamConsumer(BaseConsumer):
 
         self.message = None
         self.debug = debug
+        self.debug_warcprox = debug_warcprox
+        self.tries = tries
         self._supervisor = HarvestSupervisor(script, mq_config.host, mq_config.username, mq_config.password,
-                                             debug=debug)
+                                             working_path, debug=debug)
 
     def on_message(self):
         harvest_id = self.message["id"]
@@ -45,11 +48,13 @@ class StreamConsumer(BaseConsumer):
             # Start
             log.info("Starting %s", harvest_id)
             log.debug("Message for %s is %s", harvest_id, json.dumps(self.message, indent=4))
-            self._supervisor.start(self.message, self.routing_key)
+            self._supervisor.start(self.message, self.routing_key, debug=self.debug, debug_warcprox=self.debug_warcprox,
+                                   tries=self.tries)
         else:
             # Stop
             log.info("Stopping %s", harvest_id)
             self._supervisor.stop(harvest_id)
+
 
 if __name__ == "__main__":
     # Arguments
@@ -60,8 +65,12 @@ if __name__ == "__main__":
     parser.add_argument("queue")
     parser.add_argument("routing_keys", help="Comma separated list of routing keys")
     parser.add_argument("script")
+    parser.add_argument("working_path")
     parser.add_argument("--debug", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
                         default="False", const="True")
+    parser.add_argument("--debug-warcprox", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
+                        default="False", const="True")
+    parser.add_argument("--tries", type=int, default="3", help="Number of times to try harvests if errors.")
 
     args = parser.parse_args()
 
@@ -69,11 +78,11 @@ if __name__ == "__main__":
     logging.basicConfig(format='%(asctime)s: %(name)s --> %(message)s',
                         level=logging.DEBUG if args.debug else logging.INFO)
 
-    consumer = StreamConsumer(args.script,
+    consumer = StreamConsumer(args.script, args.working_path,
                               mq_config=MqConfig(args.host,
                                                  args.username,
                                                  args.password,
                                                  EXCHANGE,
                                                  {args.queue: args.routing_keys.split(",")}),
-                              debug=args.debug)
+                              debug=args.debug, debug_warcprox=args.debug_warcprox, tries=args.tries)
     consumer.run()

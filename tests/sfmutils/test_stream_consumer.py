@@ -2,6 +2,9 @@ from __future__ import absolute_import
 from unittest import TestCase
 from mock import MagicMock, patch
 import socket
+import tempfile
+import os
+import shutil
 from sfmutils.consumer import MqConfig
 from sfmutils.stream_consumer import StreamConsumer
 from sfmutils.supervisor import HarvestSupervisor
@@ -13,7 +16,8 @@ class TestStreamConsumer(TestCase):
         mock_supervisor_class = self.patcher.start()
         self.mock_supervisor = MagicMock(spec=HarvestSupervisor)
         mock_supervisor_class.side_effect = [self.mock_supervisor]
-        self.stream_consumer = StreamConsumer("/opt/sfm/test.py",
+        self.working_path = tempfile.mkdtemp()
+        self.stream_consumer = StreamConsumer("/opt/sfm/test.py", self.working_path,
                                               mq_config=MqConfig(None, None, None, None,
                                                                  {"test_queue": [
                                                                      "harvest.start.test.test_usertimeline",
@@ -21,6 +25,8 @@ class TestStreamConsumer(TestCase):
 
     def tearDown(self):
         self.patcher.stop()
+        if os.path.exists(self.working_path):
+            shutil.rmtree(self.working_path)
 
     def test_stop_queue(self):
         stop_queue = "test_queue_{}".format(socket.gethostname())

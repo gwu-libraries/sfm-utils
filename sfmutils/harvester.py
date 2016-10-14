@@ -2,7 +2,6 @@ from __future__ import absolute_import
 import logging
 import datetime
 import json
-import tempfile
 import shutil
 import hashlib
 import argparse
@@ -14,13 +13,15 @@ import os
 import re
 import codecs
 import uuid
+import iso8601
 from datetime import date
+from Queue import Queue, Empty
+
 from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
-from sfmutils.state_store import JsonHarvestStateStore
+from sfmutils.state_store import JsonHarvestStateStore, DelayedSetStateStoreAdapter
 from sfmutils.warcprox import warced
 from sfmutils.utils import safe_string
 from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING
-
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class HarvestResult(BaseResult):
     """
     Keeps track of the results of a harvest.
     """
+
     def __init__(self):
         BaseResult.__init__(self)
         self.urls = []
@@ -40,6 +42,8 @@ class HarvestResult(BaseResult):
         self.token_updates = {}
         # Map of tokens to uids for tokens for which uids have been found.
         self.uids = {}
+        # A counter of harvested items for testing purposes.
+        self.harvest_counter = Counter()
 
     def _result_name(self):
         return "Harvest"
@@ -89,6 +93,7 @@ class HarvestResult(BaseResult):
         self.warcs.append(filepath)
         self.warc_bytes += os.path.getsize(filepath)
 
+
 # Any exception thrown by the harvester.
 CODE_UNKNOWN_ERROR = "unknown_error"
 # Token not recognized by API.
@@ -97,6 +102,8 @@ CODE_TOKEN_NOT_FOUND = "token_not_found"
 CODE_UID_NOT_FOUND = "uid_not_found"
 # Token is unauthorized/private.
 CODE_TOKEN_UNAUTHORIZED = "token_unauthorized"
+# A resume occurred
+CODE_HARVEST_RESUMED = "harvest_resumed"
 
 
 class BaseHarvester(BaseConsumer):
@@ -108,156 +115,199 @@ class BaseHarvester(BaseConsumer):
 
     Subclasses should overrride harvest_seeds().
     """
-    def __init__(self, mq_config=None, stream_restart_interval_secs=30 * 60, debug=False, use_warcprox=True):
-        BaseConsumer.__init__(self, mq_config=mq_config)
+
+    def __init__(self, working_path, mq_config=None, stream_restart_interval_secs=30 * 60, debug=False,
+                 use_warcprox=True, queue_warc_files_interval_secs=5 * 60, warc_rollover_secs=30 * 60,
+                 debug_warcprox=False, tries=3):
+        BaseConsumer.__init__(self, working_path=working_path, mq_config=mq_config, persist_messages=True)
         self.stream_restart_interval_secs = stream_restart_interval_secs
         self.is_streaming = False
-        self.harvest_result = None
         self.routing_key = ""
         self.warc_temp_dir = None
-        self.stop_event = None
-        self.terminate_event = None
-        self.process_timer = None
+        self.stop_harvest_seeds_event = None
+        self.stop_harvest_loop_event = None
+        self.restart_stream_timer = None
         self.state_store = None
         self.debug = debug
+        self.debug_warcprox = debug_warcprox
         self.use_warcprox = use_warcprox
+        self.warc_processing_queue = Queue()
+        self.result_filepath = None
+        self.queue_warc_files_interval_secs = queue_warc_files_interval_secs
+        self.queue_warc_files_timer = None
+        self.warc_rollover_secs = warc_rollover_secs
+        self.tries = tries
+
+        # Create and start warc processing thread.
+        self.warc_processing_thread = threading.Thread(target=self._process_warc_thread, name="warc_processing_thread")
+        self.warc_processing_thread.daemon = True
+        self.warc_processing_thread.start()
 
     def on_message(self):
         assert self.message
 
-        log.info("Harvesting by message")
+        log.info("Harvesting by message with id %s", self.message["id"])
 
-        self.harvest_result = HarvestResult()
-        self.harvest_result.started = datetime.datetime.now()
-        self.terminate_event = threading.Event()
-
-        def terminate(signal_number, stack_frame):
-            log.debug("Terminate triggered")
-            self.terminate_event.set()
-            self.stop_event.set()
-
-        signal.signal(signal.SIGTERM, terminate)
-        signal.signal(signal.SIGINT, terminate)
-
-        log.debug("Message is %s" % json.dumps(self.message, indent=4))
+        self.result_filepath = os.path.join(self.working_path, "{}_result.json".format(safe_string(self.message["id"])))
 
         # Create a temp directory for WARCs
         self.warc_temp_dir = self._create_warc_temp_dir()
         self._create_state_store()
 
+        # Possibly resume a harvest
+        self.result = HarvestResult()
+
+        if os.path.exists(self.result_filepath) or len(self._list_warcs(self.warc_temp_dir)) > 0:
+            self._load_result()
+            self.result.warnings.append(
+                Msg(CODE_HARVEST_RESUMED, "Harvest resumed on {}".format(datetime.datetime.now())))
+            # Send a status message. This will give immediate indication that harvesting is occurring.
+            self._send_status_message(STATUS_RUNNING)
+            self._queue_warc_files()
+        else:
+            self.result.started = datetime.datetime.now()
+            # Send a status message. This will give immediate indication that harvesting is occurring.
+            self._send_status_message(STATUS_RUNNING)
+
+        # stop_harvest_loop_event tells the harvester to stop looping.
+        # Only streaming harvesters loop.
+        # For other harvesters, this is tripped after the first entrance into loop.
+        self.stop_harvest_loop_event = threading.Event()
+
+        # Supervisor sends a signal, indicating that the harvester should stop.
+        # This is a graceful shutdown. Harvesting seeds is stopped and processing
+        # is finished. This may take some time.
+        def shutdown(signal_number, stack_frame):
+            log.debug("Shutdown triggered")
+            self.stop_harvest_loop_event.set()
+            # stop_event tells the harvester to stop harvest_seeds.
+            # This will allow warcprox to exit.
+            self.stop_harvest_seeds_event.set()
+            if self.restart_stream_timer:
+                self.restart_stream_timer.cancel()
+            if self.queue_warc_files_timer:
+                self.queue_warc_files_timer.cancel()
+
+        signal.signal(signal.SIGTERM, shutdown)
+        signal.signal(signal.SIGINT, shutdown)
+
+        log.debug("Message is %s" % json.dumps(self.message, indent=4))
+
         # Setup the restart timer for streams
         # The restart timer stops and restarts the stream periodically.
-        # Makes makes sure that each HTTP response is limited in size.
-        def restart_stream(h):
-            log.debug("Restarting stream.")
-            h.stop_event.set()
-            h.process_timer = threading.Timer(h.stream_restart_interval_secs, restart_stream, args=[h])
-            h.process_timer.start()
+        # This makes makes sure that each HTTP response is limited in size.
         if self.is_streaming:
-            self.process_timer = threading.Timer(self.stream_restart_interval_secs, restart_stream, args=[self])
-            self.process_timer.start()
+            self.restart_stream_timer = threading.Timer(self.stream_restart_interval_secs, self._restart_stream)
+            self.restart_stream_timer.start()
 
-        while not self.terminate_event.is_set():
-            self.stop_event = threading.Event()
-            # If this isn't streaming then set terminate event so that looping doesn't occur.
+        # Start a queue warc files timer
+        self.queue_warc_files_timer = threading.Timer(self.queue_warc_files_interval_secs, self._queue_warc_files)
+        self.queue_warc_files_timer.start()
+
+        while not self.stop_harvest_loop_event.is_set():
+            # Reset the stop_harvest_seeds_event
+            self.stop_harvest_seeds_event = threading.Event()
+
+            # If this isn't streaming then set stop_harvest_seeds_event so that looping doesn't occur.
             if not self.is_streaming:
-                self.terminate_event.set()
-            try:
-                if self.use_warcprox:
-                    with warced(safe_string(self.message["id"]), self.warc_temp_dir, debug=self.debug,
-                                interrupt=self.is_streaming):
+                self.stop_harvest_loop_event.set()
+
+            # Here is where the harvesting happens.
+            try_count = 0
+            done = False
+            while not done:
+                try_count += 1
+                log.debug("Try {} of {}".format(try_count, self.tries))
+                try:
+                    if self.use_warcprox:
+                        with warced(safe_string(self.message["id"]), self.warc_temp_dir, debug=self.debug_warcprox,
+                                    interrupt=self.is_streaming,
+                                    rollover_time=self.warc_rollover_secs if not self.is_streaming else None):
+                            self.harvest_seeds()
+                    else:
                         self.harvest_seeds()
-                else:
-                    self.harvest_seeds()
-                log.debug("Exited harvesting seeds.")
-            except Exception as e:
-                log.exception("Unknown error raised during harvest")
-                self.harvest_result.success = False
-                self.harvest_result.errors.append(Msg(CODE_UNKNOWN_ERROR, str(e)))
-                self.terminate_event.set()
-            # Process differently depending on if terminating
-            if self.terminate_event.isSet():
-                self.harvest_result.ended = datetime.datetime.now()
-                if self.process_timer:
-                    self.process_timer.cancel()
-                self._process(done=True)
-            else:
-                self._process(done=False)
+                    done = True
+                    log.debug("Done harvesting seeds.")
+                except Exception as e:
+                    log.exception("Unknown error raised during harvest: %s", e)
+                    if try_count == self.tries:
+                        # Give up trying
+                        log.debug("Too many retries, so giving up on harvesting seeds.")
+                        done = True
+                        self.result.success = False
+                        self.result.errors.append(Msg(CODE_UNKNOWN_ERROR, str(e)))
+                        self.stop_harvest_loop_event.set()
+                    else:
+                        # Retry
+                        # Queue any WARC files
+                        self._queue_warc_files()
+                        # Wait for any WARC files to be processed
+                        log.debug("Waiting for processing to complete.")
+                        self.warc_processing_queue.join()
+                        log.debug("Processing complete.")
+
+            # Queue any WARC files
+            self._queue_warc_files()
+
+        # Turn off the restart_stream_timer.
+        if self.restart_stream_timer:
+            self.restart_stream_timer.cancel()
+
+        # Turn off the queue WARC files timer
+        if self.queue_warc_files_timer:
+            self.queue_warc_files_timer.cancel()
+
+        # Finish processing
+        self._finish_processing()
 
         # Delete temp dir
         if os.path.exists(self.warc_temp_dir):
             shutil.rmtree(self.warc_temp_dir)
 
-    def _process(self, done=True):
-        harvest_id = self.message["id"]
-        collection_set_id = self. message["collection_set"]["id"]
-        harvest_path = self.message["path"]
-        harvest_type = self.message["type"]
+    def _finish_processing(self):
+        # Otherwise, will not get the last WARC on a stop.
+        # No time is OK on a container kill because will resume and process last file.
+        # Queue any new files.
+        # Wait for processing to complete.
+        log.debug("Waiting for processing to complete.")
+        self.warc_processing_queue.join()
+        log.debug("Processing complete.")
+        self.result.ended = datetime.datetime.now()
 
-        if self.harvest_result.success:
-            # Send web harvest message
-            urls_set = self.harvest_result.urls_as_set()
-            if urls_set:
-                self._send_web_harvest_message(harvest_id, collection_set_id,
-                                               harvest_path, urls_set)
-            else:
-                log.debug("No urls, so not sending a web harvest message.")
+        # Send final message
+        self._send_status_message(STATUS_SUCCESS if self.result.success else STATUS_FAILURE)
 
-            # Since the urls were sent, clear them
-            if not done:
-                self.harvest_result.urls = []
+        # Delete result file
+        if os.path.exists(self.result_filepath):
+            os.remove(self.result_filepath)
 
-            # Process warc files
-            for warc_filename in self._list_warcs(self.warc_temp_dir):
-                # Move the warc
-                dest_warc_filepath = self._move_file(warc_filename,
-                                                     self.warc_temp_dir,
-                                                     self._path_for_warc(harvest_path, warc_filename))
-                self.harvest_result.add_warc(dest_warc_filepath)
-                # Send warc created message
-                self._send_warc_created_message(harvest_id, harvest_type,
-                                                collection_set_id,
-                                                uuid.uuid4().hex,
-                                                dest_warc_filepath)
+    def _queue_warc_files(self):
+        log.debug("Queueing WARC files")
+        # Stop the timer
+        if self.queue_warc_files_timer:
+            self.queue_warc_files_timer.cancel()
 
-            # TODO: Persist summary so that can resume
+        # Queue warc files
+        for warc_filename in self._list_warcs(self.warc_temp_dir):
+            log.debug("Queueing %s", warc_filename)
+            self.warc_processing_queue.put(warc_filename)
 
-        if not self.harvest_result.success:
-            status = STATUS_FAILURE
-        elif not done:
-            status = STATUS_RUNNING
-        else:
-            status = STATUS_SUCCESS
-        self._send_status_message(self.routing_key, harvest_id,
-                                  self.harvest_result, status)
-        if not done:
-            # Since these were sent, clear them.
-            self.harvest_result.errors = []
-            self.harvest_result.infos = []
-            self.harvest_result.warnings = []
-            self.harvest_result.token_updates = {}
-            self.harvest_result.uids = {}
+        # Restart the timer
+        if self.queue_warc_files_timer:
+            self.queue_warc_files_timer = threading.Timer(self.queue_warc_files_interval_secs, self._queue_warc_files)
+            self.queue_warc_files_timer.start()
 
-    def harvest_from_file(self, filepath, routing_key=None, is_streaming=False):
+    def harvest_from_file(self, filepath, is_streaming=False, delete=False):
         """
         Performs a harvest based on the a harvest start message contained in the
         provided filepath.
 
-        SIGTERM or SIGINT (Ctrl+C) will interrupt.
-
         :param filepath: filepath of the harvest start message
-        :param routing_key: routing key of the harvest start message
         :param is_streaming: True to run in streaming mode
+        :param delete: True to delete when completed
         """
-        log.debug("Harvesting from file %s", filepath)
-        with codecs.open(filepath, "r") as f:
-            self.message = json.load(f)
-
-        self.routing_key = routing_key or ""
         self.is_streaming = is_streaming
-
-        self.on_message()
-        return self.harvest_result
+        return self.message_from_file(filepath, delete=delete)
 
     def harvest_seeds(self):
         """
@@ -272,14 +322,18 @@ class BaseHarvester(BaseConsumer):
         """
         Creates a state store for the harvest.
         """
-        self.state_store = JsonHarvestStateStore(self.message["path"])
+        # We'll be delaying writing to the state store until done processing the warc file.
+        self.state_store = DelayedSetStateStoreAdapter(JsonHarvestStateStore(self.message["path"]))
 
     @staticmethod
     def _list_warcs(path):
-        warcs = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and
-                 (f.endswith(".warc") or f.endswith(".warc.gz"))]
-        if len(warcs) == 0:
-            log.warning("No warcs found in %s", path)
+        warcs = []
+        if os.path.exists(path):
+            warcs = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and
+                     (f.endswith(".warc") or f.endswith(".warc.gz"))]
+            log.debug("Found following WARCs: %s", warcs)
+        else:
+            log.warn("Warc path %s does not exist. This may be OK.", path)
         return warcs
 
     @staticmethod
@@ -288,71 +342,64 @@ class BaseHarvester(BaseConsumer):
         assert m
         return "/".join([harvest_path, m.group(1), m.group(2), m.group(3), m.group(4)])
 
-    @staticmethod
-    def _move_file(filename, src_path, dest_path):
-        src_filepath = os.path.join(src_path, filename)
-        dest_filepath = os.path.join(dest_path, filename)
-        log.debug("Moving %s to %s", src_filepath, dest_filepath)
-        if not os.path.exists(dest_path):
-            os.makedirs(dest_path)
-        shutil.move(src_filepath, dest_filepath)
-        return dest_filepath
-
-    def _send_web_harvest_message(self, harvest_id, collection_set_id, harvest_path, urls):
-        message = {
-            "id": uuid.uuid4().hex,
-            "parent_id": harvest_id,
-            "path": harvest_path,
-            "type": "web",
-            "seeds": [],
-            "collection_set": {
-                "id": collection_set_id
+    def _send_web_harvest_message(self):
+        urls_set = self.result.urls_as_set()
+        if urls_set:
+            message = {
+                "id": uuid.uuid4().hex,
+                "parent_id": self.message["id"],
+                "path": self.message["path"],
+                "type": "web",
+                "seeds": [],
+                "collection_set": {
+                    "id": self.message["collection_set"]["id"]
+                }
             }
-        }
-        for url in urls:
-            message["seeds"].append({"token": url})
+            for url in urls_set:
+                message["seeds"].append({"token": url})
 
-        self._publish_message("harvest.start.web", message, trunate_debug_length=5000)
+            self._publish_message("harvest.start.web", message, trunate_debug_length=5000)
+        else:
+            log.debug("No urls, so not sending a web harvest message.")
 
-    def _send_status_message(self, harvest_routing_key, harvest_id, harvest_result, status):
-        # Just add additional info to job message
+    def _send_status_message(self, status):
         message = {
-            "id": harvest_id,
+            "id": self.message["id"],
             "status": status,
-            "infos": [msg.to_map() for msg in harvest_result.infos],
-            "warnings": [msg.to_map() for msg in harvest_result.warnings],
-            "errors": [msg.to_map() for msg in harvest_result.errors],
-            "date_started": harvest_result.started.isoformat(),
+            "infos": [msg.to_map() for msg in self.result.infos],
+            "warnings": [msg.to_map() for msg in self.result.warnings],
+            "errors": [msg.to_map() for msg in self.result.errors],
+            "date_started": self.result.started.isoformat(),
             "stats": dict(),
-            "token_updates": harvest_result.token_updates,
-            "uids": harvest_result.uids,
+            "token_updates": self.result.token_updates,
+            "uids": self.result.uids,
             "warcs": {
-                "count": len(harvest_result.warcs),
-                "bytes": harvest_result.warc_bytes
+                "count": len(self.result.warcs),
+                "bytes": self.result.warc_bytes
             }
         }
 
-        for day, stats in harvest_result.stats().items():
+        for day, stats in self.result.stats().items():
             message["stats"][day.isoformat()] = dict(stats)
 
-        if harvest_result.ended:
-            message["date_ended"] = harvest_result.ended.isoformat()
+        if self.result.ended:
+            message["date_ended"] = self.result.ended.isoformat()
 
         # Routing key may be none
-        status_routing_key = harvest_routing_key.replace("start", "status")
+        status_routing_key = self.routing_key.replace("start", "status")
         self._publish_message(status_routing_key, message)
 
-    def _send_warc_created_message(self, harvest_id, harvest_type, collection_set_id, warc_id, warc_path):
+    def _send_warc_created_message(self, warc_path):
         message = {
             "harvest": {
-                "id": harvest_id,
-                "type": harvest_type
+                "id": self.message["id"],
+                "type": self.message["type"]
             },
             "collection_set": {
-                "id": collection_set_id
+                "id": self.message["collection_set"]["id"]
             },
             "warc": {
-                "id": warc_id,
+                "id": uuid.uuid4().hex,
                 "path": warc_path,
                 "date_created": datetime.datetime.fromtimestamp(os.path.getctime(warc_path)).isoformat(),
                 "bytes": os.path.getsize(warc_path),
@@ -367,7 +414,120 @@ class BaseHarvester(BaseConsumer):
 
         :return: the directory path
         """
-        return tempfile.mkdtemp(prefix=safe_string(self.message["id"]))
+        path = os.path.join(self.working_path, "tmp", safe_string(self.message["id"]))
+        if not os.path.exists(path):
+            os.makedirs(path)
+        return path
+
+    def _restart_stream(self):
+        log.debug("Restarting stream.")
+        self.stop_harvest_seeds_event.set()
+        self.restart_stream_timer = threading.Timer(self.stream_restart_interval_secs, self._restart_stream)
+        self.restart_stream_timer.start()
+
+    def _save_result(self):
+        result_message = {
+            "warcs": self.result.warcs,
+            "warc_bytes": self.result.warc_bytes,
+            "stats": [],
+            "started": self.result.started.isoformat(),
+            "infos": [msg.to_map() for msg in self.result.infos],
+            "warnings": [msg.to_map() for msg in self.result.warnings],
+            "errors": [msg.to_map() for msg in self.result.errors]
+
+        }
+
+        for day, stats in self.result.stats().items():
+            result_message["stats"].append((day.isoformat(), dict(stats)))
+
+        with codecs.open(self.result_filepath, 'w') as f:
+            json.dump(result_message, f)
+
+        log.debug("Persisted result to %s", self.result_filepath)
+
+    def _load_result(self):
+        if os.path.exists(self.result_filepath):
+            log.info("Resuming from previous results")
+            with codecs.open(self.result_filepath, 'r') as f:
+                result_message = json.load(f)
+            log.debug("Previous results: {}".format(json.dumps(result_message, indent=4)))
+            self.result.warcs = result_message["warcs"]
+            self.result.warc_bytes = result_message["warc_bytes"]
+            self.result.started = iso8601.parse_date(result_message["started"])
+            self.result.infos = list([Msg(msg["code"], msg["message"]) for msg in result_message["infos"]])
+            self.result.warnings = list([Msg(msg["code"], msg["message"]) for msg in result_message["warnings"]])
+            self.result.errors = list([Msg(msg["code"], msg["message"]) for msg in result_message["errors"]])
+
+            for day, stats in result_message["stats"]:
+                for item, count in stats.items():
+                    self.result.increment_stats(item, count=count, day=iso8601.parse_date(day).date())
+
+    def _process_warc_thread(self):
+        log.info("Starting WARC processing thread")
+        # This will continue until harvester is killed.
+        while True:
+            # This will block
+            try:
+                warc_filename = self.warc_processing_queue.get(timeout=1)
+            except Empty:
+                continue
+            # Make sure file exists. Possible that same file will be put in queue multiple times.
+            warc_filepath = os.path.join(self.warc_temp_dir, warc_filename)
+            if os.path.exists(warc_filepath):
+                log.info("Processing %s", warc_filename)
+
+                # Process the warc
+                self.process_warc(warc_filepath)
+
+                # Send web harvest message
+                self._send_web_harvest_message()
+
+                # Since the urls were sent, clear them
+                self.result.urls = []
+
+                # Move the warc
+                dest_path = self._path_for_warc(self.message["path"], warc_filename)
+                dest_warc_filepath = os.path.join(dest_path, warc_filename)
+                log.debug("Moving %s to %s", warc_filepath, dest_warc_filepath)
+                if not os.path.exists(dest_path):
+                    os.makedirs(dest_path)
+                shutil.move(warc_filepath, dest_warc_filepath)
+
+                # Persist the state
+                self.state_store.pass_state()
+
+                # Add it to result
+                self.result.add_warc(dest_warc_filepath)
+
+                # Send warc created message
+                self._send_warc_created_message(dest_warc_filepath)
+
+                # Send status message
+                self._send_status_message(STATUS_RUNNING)
+
+                # Since these were sent, clear them.
+                self.result.token_updates = {}
+                self.result.uids = {}
+
+                # Persist the result for resuming
+                self._save_result()
+
+            else:
+                log.debug("Skipping processing %s", warc_filename)
+            # Mark this as done.
+            self.warc_processing_queue.task_done()
+        log.debug("Exiting warc processing thread")
+
+    def process_warc(self, warc_filepath):
+        """
+        Processes the provided WARC file.
+
+        Processing involves:
+        * Extracting URLs and adding to self.result.
+        * Save state to self.state_store.
+        * Increment counts in self.result.
+        """
+        pass
 
     @staticmethod
     def main(cls, queue, routing_keys):
@@ -392,6 +552,8 @@ class BaseHarvester(BaseConsumer):
                             default="False", const="True")
         parser.add_argument("--debug-http", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
                             default="False", const="True")
+        parser.add_argument("--debug-warcprox", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
+                            default="False", const="True")
 
         subparsers = parser.add_subparsers(dest="command")
 
@@ -400,14 +562,18 @@ class BaseHarvester(BaseConsumer):
         service_parser.add_argument("host")
         service_parser.add_argument("username")
         service_parser.add_argument("password")
+        service_parser.add_argument("working_path")
+        service_parser.add_argument("--skip-resume", action="store_true")
+        service_parser.add_argument("--tries", type=int, default="3", help="Number of times to try harvests if errors.")
 
         seed_parser = subparsers.add_parser("seed", help="Harvest based on a seed file.")
         seed_parser.add_argument("filepath", help="Filepath of the seed file.")
+        seed_parser.add_argument("working_path")
         seed_parser.add_argument("--streaming", action="store_true", help="Run in streaming mode.")
         seed_parser.add_argument("--host")
         seed_parser.add_argument("--username")
         seed_parser.add_argument("--password")
-        seed_parser.add_argument("--routing-key")
+        seed_parser.add_argument("--tries", type=int, default="3", help="Number of times to try harvests if errors.")
 
         args = parser.parse_args()
 
@@ -419,17 +585,22 @@ class BaseHarvester(BaseConsumer):
         logging.getLogger("oauthlib").setLevel(logging.debug if args.debug_http else logging.INFO)
 
         if args.command == "service":
-            harvester = cls(mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE,
-                                               {queue: routing_keys}), debug=args.debug)
+            harvester = cls(args.working_path, mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE,
+                                                                  {queue: routing_keys}),
+                            debug=args.debug, debug_warcprox=args.debug_warcprox, tries=args.tries)
+            if not args.skip_resume:
+                harvester.resume_from_file()
             harvester.run()
         elif args.command == "seed":
             mq_config = MqConfig(args.host, args.username, args.password, EXCHANGE, None) \
                 if args.host and args.username and args.password else None
-            harvester = cls(mq_config=mq_config, debug=args.debug)
-            harvester.harvest_from_file(args.filepath, routing_key=args.routing_key, is_streaming=args.streaming)
-            if harvester.harvest_result:
-                log.info("Result is: %s", harvester.harvest_result)
-                sys.exit(0)
-            else:
-                log.warning("Result is: %s", harvester.harvest_result)
-                sys.exit(1)
+            harvester = cls(args.working_path, mq_config=mq_config, debug=args.debug,
+                            debug_warcprox=args.debug_warcprox, tries=args.tries)
+            harvester.harvest_from_file(args.filepath, is_streaming=args.streaming)
+            if __name__ == '__main__':
+                if harvester.result:
+                    log.info("Result is: %s", harvester.result)
+                    sys.exit(0)
+                else:
+                    log.warning("Result is: %s", harvester.result)
+                    sys.exit(1)
