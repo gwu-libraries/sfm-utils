@@ -23,6 +23,7 @@ class BaseWarcIter:
     Subclasses should overrride _select_record(), _item_iter(), item_types, and
     possibly line_oriented.
     """
+
     def __init__(self, filepaths):
         if isinstance(filepaths, basestring):
             self.filepaths = (filepaths,)
@@ -58,7 +59,7 @@ class BaseWarcIter:
             yield_count = 0
             for record_count, record in enumerate(f):
                 self._debug_counts(filename, record_count, yield_count, by_record_count=True)
-  
+
                 if self._select_record(record.url):
                     # An iterator over json objects which constitute the payload of a record.
                     if not self.line_oriented:
@@ -68,7 +69,7 @@ class BaseWarcIter:
                         encoding_type = record.http_response.getheader('transfer-encoding')
                         if encoding_type and encoding_type.lower() == "chunked":
                             for line in record.http_response.read_chunked(decode_content=True):
-                                    payload_data += line
+                                payload_data += line
                         else:
                             payload_data = record.http_response.data
                         payload_parts_iter = [payload_data]
@@ -84,27 +85,30 @@ class BaseWarcIter:
                             log.warn("Bad json in record %s: %s", record.header.record_id, payload_part)
                         if json_obj:
                             for item_type, item_id, item_date, item in self._item_iter(record.url, json_obj):
-                                yield_item = True
-                                if limit_item_types and item_type not in limit_item_types:
-                                    yield_item = False
-                                if item_date_start and item_date and item_date < item_date_start:
-                                    yield_item = False
-                                if item_date_end and item_date and item_date > item_date_end:
-                                    yield_item = False
-                                if not self._select_item(item):
-                                    yield_item = False
-                                if dedupe and yield_item:
-                                    if item_id in seen_ids:
+                                # None for item_type indicates that the type is not handled. OK to ignore.
+                                if item_type is not None:
+                                    yield_item = True
+                                    if limit_item_types and item_type not in limit_item_types:
                                         yield_item = False
-                                    else:
-                                        seen_ids[item_id] = True
-                                if yield_item:
-                                    if item is not None:
-                                        yield_count += 1
-                                        self._debug_counts(filename, record_count, yield_count, by_record_count=False)
-                                        yield IterItem(item_type, item_id, item_date, record.url, item)
-                                    else:
-                                        log.warn("Bad response in record %s", record.header.record_id)
+                                    if item_date_start and item_date and item_date < item_date_start:
+                                        yield_item = False
+                                    if item_date_end and item_date and item_date > item_date_end:
+                                        yield_item = False
+                                    if not self._select_item(item):
+                                        yield_item = False
+                                    if dedupe and yield_item:
+                                        if item_id in seen_ids:
+                                            yield_item = False
+                                        else:
+                                            seen_ids[item_id] = True
+                                    if yield_item:
+                                        if item is not None:
+                                            yield_count += 1
+                                            self._debug_counts(filename, record_count, yield_count,
+                                                               by_record_count=False)
+                                            yield IterItem(item_type, item_id, item_date, record.url, item)
+                                        else:
+                                            log.warn("Bad response in record %s", record.header.record_id)
 
     def _select_record(self, url):
         """
@@ -120,7 +124,7 @@ class BaseWarcIter:
         return True
 
     def print_iter(self, pretty=False, fp=sys.stdout, limit_item_types=None, print_item_type=False, dedupe=False):
-        for item_type,_, _, _, item in self.iter(limit_item_types=limit_item_types, dedupe=dedupe):
+        for item_type, _, _, _, item in self.iter(limit_item_types=limit_item_types, dedupe=dedupe):
             if print_item_type:
                 fp.write("{}:".format(item_type))
             json.dump(item, fp, indent=4 if pretty else None)
