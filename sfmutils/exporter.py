@@ -14,6 +14,7 @@ import iso8601
 import argparse
 import sys
 import shutil
+import tempfile
 from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE
 
 log = logging.getLogger(__name__)
@@ -108,6 +109,8 @@ class BaseExporter(BaseConsumer):
                     filepath = "{}.{}".format(base_filepath, export_formats[export_format][0])
                     log.info("Exporting to %s", filepath)
                     export_formats[export_format][1](table, filepath)
+                    if export_format == 'html':
+                        self._file_fix(filepath, prefix="<html><head><meta charset='utf-8'></head>\n", suffix="</html>")
                 else:
                     self.result.errors.append(
                         Msg(CODE_UNSUPPORTED_EXPORT_FORMAT, "{} is not supported".format(export_format)))
@@ -128,6 +131,20 @@ class BaseExporter(BaseConsumer):
 
         self.result.ended = datetime.datetime.now()
         self._send_response_message(self.routing_key, export_id, self.result)
+
+    @staticmethod
+    def _file_fix(filepath, prefix=None, suffix=None):
+        """
+        create a temp file to save the large file object, don't
+        need to load file to memory
+        """
+        with tempfile.NamedTemporaryFile(dir='.', delete=False) as outfile:
+            if prefix:
+                outfile.write(prefix)
+            shutil.copyfileobj(file(filepath, 'r'), outfile)
+            if suffix:
+                outfile.write(suffix)
+        shutil.move(outfile.name, filepath)
 
     def _full_json_export(self, warc_paths, export_filepath, dedupe, item_date_start, item_date_end, seed_uids):
         with codecs.open(export_filepath, "w") as f:
@@ -289,12 +306,14 @@ class BaseTable(petl.Table):
             except KeyError, e:
                 log.warn("Invalid key %s in %s", e.message, json.dumps(post.item, indent=4))
 
+
 class DateEncoder(JSONEncoder):
-     def default(self, obj):
-         if hasattr(obj, 'isoformat'):
-             return obj.isoformat()
-         # Let the base class default method deal with others
-         return JSONEncoder.default(self, obj)
+    def default(self, obj):
+        if hasattr(obj, 'isoformat'):
+            return obj.isoformat()
+        # Let the base class default method deal with others
+        return JSONEncoder.default(self, obj)
+
 
 def to_lineoriented_json(table, source):
     """
