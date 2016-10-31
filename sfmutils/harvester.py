@@ -331,7 +331,7 @@ class BaseHarvester(BaseConsumer):
         if os.path.exists(path):
             warcs = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and
                      (f.endswith(".warc") or f.endswith(".warc.gz"))]
-            log.debug("Found following WARCs: %s", warcs)
+            log.debug("Found following WARCs in %s: %s", path, warcs)
         else:
             log.warn("Warc path %s does not exist. This may be OK.", path)
         return warcs
@@ -353,6 +353,9 @@ class BaseHarvester(BaseConsumer):
                 "seeds": [],
                 "collection_set": {
                     "id": self.message["collection_set"]["id"]
+                },
+                "collection": {
+                    "id": self.message["collection"]["id"]
                 }
             }
             for url in urls_set:
@@ -397,6 +400,9 @@ class BaseHarvester(BaseConsumer):
             },
             "collection_set": {
                 "id": self.message["collection_set"]["id"]
+            },
+            "collection": {
+                "id": self.message["collection"]["id"]
             },
             "warc": {
                 "id": uuid.uuid4().hex,
