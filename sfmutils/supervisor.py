@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 class HarvestSupervisor:
     def __init__(self, script, mq_host, mq_username, mq_password, working_path,
-                 process_owner=None, python_executable="python", log_path="/var/log/sfm",
+                 process_owner=None, python_executable="python", log_path=None,
                  conf_path="/etc/supervisor/conf.d", internal_ip="127.0.0.1", socket_file="/var/run/supervisor.sock",
                  debug=False):
         self.conf_path = conf_path
@@ -25,7 +25,7 @@ class HarvestSupervisor:
         self.mq_username = mq_username
         self.mq_password = mq_password
         self.working_path = working_path
-        self.log_path = log_path
+        self.log_path = log_path or os.path.join(self.working_path, "log")
         self.internal_ip = internal_ip
         self.socket_file = socket_file
         if debug:
