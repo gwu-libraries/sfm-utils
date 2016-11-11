@@ -54,7 +54,7 @@ class TestExporter(tests.TestCase):
         mock_exchange = MagicMock(spec=Exchange)
         mock_exchange.name = "test exchange"
         mock_producer = MagicMock(spec=Producer)
-        mock_producer_cls.side_effect = [mock_producer]
+        mock_producer_cls.return_value = mock_producer
 
         item_date_start = "2007-01-25T12:00:00Z"
         item_datetime_start = iso8601.parse_date(item_date_start)
@@ -80,7 +80,7 @@ class TestExporter(tests.TestCase):
         }
 
         exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, self.working_path,
-                                warc_base_path=self.warc_base_path)
+                                warc_base_path=self.warc_base_path, host="testhost")
         exporter.mq_config = True
         exporter._producer_connection = mock_connection
         exporter.exchange = mock_exchange
@@ -107,10 +107,24 @@ class TestExporter(tests.TestCase):
         self.assertEqual("publish", name)
         self.assertEqual("export.status.test.test_user", kwargs["routing_key"])
         export_status_message = kwargs["body"]
+        self.assertEqual("running", export_status_message["status"])
+        self.assertTrue(iso8601.parse_date(export_status_message["date_started"]))
+        self.assertEqual("test1", export_status_message["id"])
+        self.assertEqual("Base Exporter", export_status_message["service"])
+        self.assertEqual("testhost", export_status_message["host"])
+        self.assertTrue(export_status_message["instance"])
+
+        name, _, kwargs = mock_producer.mock_calls[1]
+        self.assertEqual("publish", name)
+        self.assertEqual("export.status.test.test_user", kwargs["routing_key"])
+        export_status_message = kwargs["body"]
         self.assertEqual("completed success", export_status_message["status"])
         self.assertTrue(iso8601.parse_date(export_status_message["date_started"]))
         self.assertTrue(iso8601.parse_date(export_status_message["date_ended"]))
         self.assertEqual("test1", export_status_message["id"])
+        self.assertEqual("Base Exporter", export_status_message["service"])
+        self.assertEqual("testhost", export_status_message["host"])
+        self.assertTrue(export_status_message["instance"])
 
     @patch("sfmutils.exporter.ApiClient", autospec=True)
     # Mock out Producer
@@ -131,7 +145,7 @@ class TestExporter(tests.TestCase):
         mock_exchange = MagicMock(spec=Exchange)
         mock_exchange.name = "test exchange"
         mock_producer = MagicMock(spec=Producer)
-        mock_producer_cls.side_effect = [mock_producer]
+        mock_producer_cls.return_value = mock_producer
 
         export_message = {
             "id": "test1",
@@ -145,7 +159,7 @@ class TestExporter(tests.TestCase):
         }
 
         exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, self.working_path,
-                                warc_base_path=self.warc_base_path)
+                                warc_base_path=self.warc_base_path, host="testhost")
         exporter.mq_config = True
         exporter._producer_connection = mock_connection
         exporter.exchange = mock_exchange
@@ -168,7 +182,7 @@ class TestExporter(tests.TestCase):
         self.assertEqual(2, len(lines))
         self.assertEqual("k2v1\n", lines[0])
 
-        name, _, kwargs = mock_producer.mock_calls[0]
+        name, _, kwargs = mock_producer.mock_calls[1]
         self.assertEqual("publish", name)
         self.assertEqual("export.status.test.test_user", kwargs["routing_key"])
         export_status_message = kwargs["body"]
@@ -205,7 +219,7 @@ class TestExporter(tests.TestCase):
         }
 
         exporter = BaseExporter("http://test", mock_warc_iter_cls, mock_table_cls, self.working_path,
-                                warc_base_path=self.warc_base_path)
+                                warc_base_path=self.warc_base_path, host="testhost")
 
         exporter.routing_key = "export.start.test.test_user"
         exporter.message = export_message
@@ -246,7 +260,8 @@ class TestExporter(tests.TestCase):
             "path": self.export_path
         }
 
-        exporter = BaseExporter("http://test", None, None, self.working_path, warc_base_path=self.warc_base_path)
+        exporter = BaseExporter("http://test", None, None, self.working_path, warc_base_path=self.warc_base_path,
+                                host="testhost")
 
         exporter.routing_key = "export.start.test.test_user"
         exporter.message = export_message
@@ -273,7 +288,7 @@ class TestExporter(tests.TestCase):
         mock_exchange = MagicMock(spec=Exchange)
         mock_exchange.name = "test exchange"
         mock_producer = MagicMock(spec=Producer)
-        mock_producer_cls.side_effect = [mock_producer]
+        mock_producer_cls.return_value = mock_producer
 
         export_message = {
             "id": "test2",
@@ -285,7 +300,8 @@ class TestExporter(tests.TestCase):
             "path": self.export_path
         }
 
-        exporter = BaseExporter("http://test", None, None, self.working_path, warc_base_path=self.warc_base_path)
+        exporter = BaseExporter("http://test", None, None, self.working_path, warc_base_path=self.warc_base_path,
+                                host="testhost")
         exporter.mq_config = True
         exporter._producer_connection = mock_connection
         exporter.exchange = mock_exchange
@@ -301,7 +317,7 @@ class TestExporter(tests.TestCase):
 
         self.assertFalse(exporter.result.success)
 
-        name, _, kwargs = mock_producer.mock_calls[0]
+        name, _, kwargs = mock_producer.mock_calls[1]
         self.assertEqual("publish", name)
         self.assertEqual("export.status.test.test_user", kwargs["routing_key"])
         export_status_message = kwargs["body"]
@@ -324,7 +340,8 @@ class TestExporter(tests.TestCase):
         now = datetime.datetime.now()
         limit_uids = [11, 14]
 
-        exporter = BaseExporter(None, mock_warc_iter_cls, None, self.working_path, warc_base_path=self.warc_base_path)
+        exporter = BaseExporter(None, mock_warc_iter_cls, None, self.working_path, warc_base_path=self.warc_base_path,
+                                host="testhost")
 
         exporter._full_json_export(self.warcs, export_filepath, True, now, None, limit_uids)
 

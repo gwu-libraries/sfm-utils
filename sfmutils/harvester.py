@@ -115,10 +115,9 @@ class BaseHarvester(BaseConsumer):
 
     Subclasses should overrride harvest_seeds().
     """
-
     def __init__(self, working_path, mq_config=None, stream_restart_interval_secs=30 * 60, debug=False,
                  use_warcprox=True, queue_warc_files_interval_secs=5 * 60, warc_rollover_secs=30 * 60,
-                 debug_warcprox=False, tries=3):
+                 debug_warcprox=False, tries=3, host=os.environ.get("HOSTNAME")):
         BaseConsumer.__init__(self, working_path=working_path, mq_config=mq_config, persist_messages=True)
         self.stream_restart_interval_secs = stream_restart_interval_secs
         self.is_streaming = False
@@ -142,6 +141,8 @@ class BaseHarvester(BaseConsumer):
         self.warc_processing_thread = threading.Thread(target=self._process_warc_thread, name="warc_processing_thread")
         self.warc_processing_thread.daemon = True
         self.warc_processing_thread.start()
+        assert host
+        self.host = host
 
     def on_message(self):
         assert self.message
@@ -381,7 +382,11 @@ class BaseHarvester(BaseConsumer):
             "warcs": {
                 "count": len(self.result.warcs),
                 "bytes": self.result.warc_bytes
-            }
+            },
+            # This will add spaces before caps
+            "service": re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', self.__class__.__name__),
+            "host": self.host,
+            "instance": str(os.getpid())
         }
 
         for day, stats in self.result.stats().items():
@@ -393,6 +398,9 @@ class BaseHarvester(BaseConsumer):
         # Routing key may be none
         status_routing_key = self.routing_key.replace("start", "status")
         self._publish_message(status_routing_key, message)
+
+    def _clean_name(self, name):
+        re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', name)
 
     def _send_warc_created_message(self, warc_path):
         message = {

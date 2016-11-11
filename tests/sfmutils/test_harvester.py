@@ -45,7 +45,8 @@ def write_message_file(message):
 class TestableHarvester(BaseHarvester):
     def __init__(self, working_path, connection=None, exchange=None, raise_exception_on_count=(0,), shutdown_on_count=0,
                  tries=1):
-        BaseHarvester.__init__(self, working_path, stream_restart_interval_secs=5, warc_rollover_secs=120, tries=tries)
+        BaseHarvester.__init__(self, working_path, stream_restart_interval_secs=5, warc_rollover_secs=120, tries=tries,
+                               host="localhost")
         if connection:
             self.mq_config = True
             self._producer_connection = connection
@@ -575,7 +576,7 @@ class TestBaseHarvester(TestCase):
         self.assert_state_store(1)
 
     def test_list_warcs(self):
-        harvester = BaseHarvester(self.working_path)
+        harvester = BaseHarvester(self.working_path, host="localhost")
         write_fake_warc(self.working_path, "test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000.warc.gz")
         write_fake_warc(self.working_path, "test_1-20151109195229879-00001-97528-GLSS-F0G5RP-8000.warc")
         write_fake_warc(self.working_path, "test_1-20151109195229879-00002-97528-GLSS-F0G5RP-8000")
