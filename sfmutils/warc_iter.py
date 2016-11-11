@@ -205,8 +205,7 @@ class BaseWarcIter:
         args = parser.parse_args()
 
         # Logging
-        logging.basicConfig(format='%(asctime)s: %(name)s --> %(message)s',
-                            level=logging.DEBUG if args.debug else logging.INFO)
+        logging.getLogger().setLevel(logging.DEBUG if args.debug else logging.INFO)
 
         main_limit_item_types = args.item_types.split(",") if "item_types" in vars(args) else None
 

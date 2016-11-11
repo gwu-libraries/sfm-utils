@@ -264,6 +264,8 @@ class BaseHarvester(BaseConsumer):
         if os.path.exists(self.warc_temp_dir):
             shutil.rmtree(self.warc_temp_dir)
 
+        log.info("Done harvesting by message with id %s", self.message["id"])
+
     def _finish_processing(self):
         # Otherwise, will not get the last WARC on a stop.
         # No time is OK on a container kill because will resume and process last file.
@@ -584,8 +586,7 @@ class BaseHarvester(BaseConsumer):
         args = parser.parse_args()
 
         # Logging
-        logging.basicConfig(format='%(asctime)s: %(name)s --> %(message)s',
-                            level=logging.DEBUG if args.debug else logging.INFO)
+        logging.getLogger().setLevel(logging.DEBUG if args.debug else logging.INFO)
         logging.getLogger("requests").setLevel(logging.debug if args.debug_http else logging.INFO)
         logging.getLogger("requests_oauthlib").setLevel(logging.debug if args.debug_http else logging.INFO)
         logging.getLogger("oauthlib").setLevel(logging.debug if args.debug_http else logging.INFO)
