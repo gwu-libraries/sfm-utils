@@ -39,7 +39,7 @@ class ExportResult(BaseResult):
 
 class BaseExporter(BaseConsumer):
     def __init__(self, api_base_url, warc_iter_cls, table_cls, working_path, mq_config=None, warc_base_path=None,
-                 limit_item_types=None, host=os.environ.get("HOSTNAME")):
+                 limit_item_types=None, host=None):
         BaseConsumer.__init__(self, mq_config=mq_config, working_path=working_path, persist_messages=True)
         self.api_client = ApiClient(api_base_url)
         self.warc_iter_cls = warc_iter_cls
@@ -47,8 +47,7 @@ class BaseExporter(BaseConsumer):
         self.limit_item_types = limit_item_types
         # This is for unit tests only.
         self.warc_base_path = warc_base_path
-        assert host
-        self.host = host
+        self.host = host or os.environ.get("HOSTNAME", "localhost")
 
     def on_message(self):
         assert self.message
