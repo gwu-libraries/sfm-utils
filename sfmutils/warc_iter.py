@@ -78,11 +78,12 @@ class BaseWarcIter:
                         payload_parts_iter = self._iter_lines(record.http_response)
                     for payload_part in payload_parts_iter:
                         json_obj = None
-                        try:
-                            # A non-line-oriented payload only has one payload part.
-                            json_obj = json.loads(payload_part)
-                        except ValueError:
-                            log.warn("Bad json in record %s: %s", record.header.record_id, payload_part)
+                        if payload_part:
+                            try:
+                                # A non-line-oriented payload only has one payload part.
+                                json_obj = json.loads(payload_part)
+                            except ValueError:
+                                log.warn("Bad json in record %s: %s", record.header.record_id, payload_part)
                         if json_obj:
                             for item_type, item_id, item_date, item in self._item_iter(record.url, json_obj):
                                 # None for item_type indicates that the type is not handled. OK to ignore.
