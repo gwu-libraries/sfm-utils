@@ -16,6 +16,7 @@ import shutil
 import tempfile
 import re
 from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING
+from itertools import islice
 
 log = logging.getLogger(__name__)
 
@@ -74,6 +75,7 @@ class BaseExporter(BaseConsumer):
             harvest_date_end = self.message.get("harvest_date_end")
             warc_paths = self._get_warc_paths(collection_id, seed_ids, harvest_date_start, harvest_date_end)
             export_format = self.message["format"]
+            export_segment_size = self.message["segment_size"]
             export_path = self.message["path"]
             dedupe = self.message.get("dedupe", False)
             item_date_start = iso8601.parse_date(
@@ -100,21 +102,26 @@ class BaseExporter(BaseConsumer):
                 }
                 # Other possibilities: XML, databases, HDFS
                 if export_format == "json_full":
-                    filepath = "{}.json".format(base_filepath)
-                    log.info("Exporting to %s", filepath)
-                    self._full_json_export(warc_paths, filepath, dedupe, item_date_start, item_date_end, seed_uids)
+                    self._full_json_export(warc_paths, base_filepath, dedupe, item_date_start, item_date_end, seed_uids,
+                                           export_segment_size)
                 elif export_format == "dehydrate":
-                    table = self.table_cls(warc_paths, dedupe, item_date_start, item_date_end, seed_uids)
-                    filepath = "{}.txt".format(base_filepath)
-                    log.info("Exporting to %s", filepath)
-                    petl.totext(table, filepath, template="{{{}}}\n".format(table.id_field()))
+                    tables = self.table_cls(warc_paths, dedupe, item_date_start, item_date_end, seed_uids,
+                                            export_segment_size)
+                    for idx, table in enumerate(tables):
+                        filepath = "{}_{}.txt".format(base_filepath, str(idx + 1).zfill(3))
+                        log.info("Exporting to %s", filepath)
+                        petl.totext(table, filepath, template="{{{}}}\n".format(tables.id_field()))
                 elif export_format in export_formats:
-                    table = self.table_cls(warc_paths, dedupe, item_date_start, item_date_end, seed_uids)
-                    filepath = "{}.{}".format(base_filepath, export_formats[export_format][0])
-                    log.info("Exporting to %s", filepath)
-                    export_formats[export_format][1](table, filepath)
-                    if export_format == 'html':
-                        self._file_fix(filepath, prefix="<html><head><meta charset='utf-8'></head>\n", suffix="</html>")
+                    tables = self.table_cls(warc_paths, dedupe, item_date_start, item_date_end, seed_uids,
+                                            export_segment_size)
+                    for idx, table in enumerate(tables):
+                        filepath = "{}_{}.{}".format(base_filepath, str(idx + 1).zfill(3),
+                                                     export_formats[export_format][0])
+                        log.info("Exporting to %s", filepath)
+                        export_formats[export_format][1](table, filepath)
+                        if export_format == 'html':
+                            self._file_fix(filepath, prefix="<html><head><meta charset='utf-8'></head>\n",
+                                           suffix="</html>")
                 else:
                     self.result.errors.append(
                         Msg(CODE_UNSUPPORTED_EXPORT_FORMAT, "{} is not supported".format(export_format)))
@@ -151,14 +158,35 @@ class BaseExporter(BaseConsumer):
                 outfile.write(suffix)
         shutil.move(outfile.name, filepath)
 
-    def _full_json_export(self, warc_paths, export_filepath, dedupe, item_date_start, item_date_end, seed_uids):
-        with codecs.open(export_filepath, "w") as f:
-            for status in self.warc_iter_cls(warc_paths, seed_uids).iter(dedupe=dedupe,
-                                                                         item_date_start=item_date_start,
-                                                                         item_date_end=item_date_end,
-                                                                         limit_item_types=self.limit_item_types):
-                json.dump(status.item, f)
-                f.write("\n")
+    def _full_json_export(self, warc_paths, base_filepath, dedupe, item_date_start, item_date_end, seed_uids,
+                          export_segment_size):
+
+        warcs = self.warc_iter_cls(warc_paths, seed_uids).iter(dedupe=dedupe,
+                                                               item_date_start=item_date_start,
+                                                               item_date_end=item_date_end,
+                                                               limit_item_types=self.limit_item_types)
+
+        for idx, statuses in enumerate(self._chunk_json(warcs, export_segment_size)):
+            export_filepath = "{}_{}.json".format(base_filepath, str(idx + 1).zfill(3))
+            log.info("Exporting to %s", export_filepath)
+            with codecs.open(export_filepath, "w") as f:
+                for status in statuses:
+                    json.dump(status.item, f)
+                    f.write("\n")
+
+    def _chunk_json(self, warcs, chunk_size):
+        iterable = iter(warcs)
+        split_size = chunk_size - 1 if chunk_size else None
+        for post in iterable:
+            # define the chunk
+            def chunk():
+                # get the first
+                yield post
+                # get the left chunk_size
+                for more in islice(iterable, split_size):
+                    yield more
+
+            yield chunk()
 
     def _get_warc_paths(self, collection_id, seed_ids, harvest_date_start, harvest_date_end):
         """
@@ -272,7 +300,7 @@ class BaseTable(petl.Table):
     """
 
     def __init__(self, warc_paths, dedupe, item_date_start, item_date_end, seed_uids, warc_iter_cls,
-                 limit_item_types=None):
+                 segment_row_size, limit_item_types=None):
         self.warc_paths = warc_paths
         self.dedupe = dedupe
         self.item_date_start = item_date_start
@@ -280,6 +308,7 @@ class BaseTable(petl.Table):
         self.seed_uids = seed_uids
         self.warc_iter_cls = warc_iter_cls
         self.limit_item_types = limit_item_types
+        self.segment_row_size = segment_row_size
 
     def _header_row(self):
         """
@@ -302,15 +331,27 @@ class BaseTable(petl.Table):
         pass
 
     def __iter__(self):
-        # yield the header row
-        yield self._header_row()
-        for post in self.warc_iter_cls(self.warc_paths,
-                                       self.seed_uids).iter(dedupe=self.dedupe,
-                                                            item_date_start=self.item_date_start,
-                                                            item_date_end=self.item_date_end,
-                                                            limit_item_types=self.limit_item_types):
+        warcs = self.warc_iter_cls(self.warc_paths,
+                                   self.seed_uids).iter(dedupe=self.dedupe,
+                                                        item_date_start=self.item_date_start,
+                                                        item_date_end=self.item_date_end,
+                                                        limit_item_types=self.limit_item_types)
+        iterator_warc = iter(warcs)
+        split_size = self.segment_row_size - 1 if self.segment_row_size else None
+        # make the iterator warc to chunks based on the row size
+        for post in iterator_warc:
             try:
-                yield self._row(post.item)
+                # define the chunk
+                def chunk():
+                    # yield the header row
+                    yield self._header_row()
+                    # get the first row in for loop
+                    yield self._row(post.item)
+                    # get the left more rows
+                    for more in islice(iterator_warc, split_size):
+                        yield self._row(more.item)
+
+                yield chunk()
             except KeyError, e:
                 log.warn("Invalid key %s in %s", e.message, json.dumps(post.item, indent=4))
 
