@@ -16,7 +16,7 @@ def main(sys_argv):
                                                 "2015-02-22T14:49:07Z")
     parser.add_argument("--harvest-end", help="ISO8601 datetime before which harvest was performed. For example, "
                                               "2015-02-22T14:49:07Z")
-    default_api_base_url = "http://api"
+    default_api_base_url = "http://api:8080"
     parser.add_argument("--api-base-url", help="Base url of the SFM API. Default is {}.".format(default_api_base_url),
                         default=default_api_base_url)
     parser.add_argument("--debug", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",

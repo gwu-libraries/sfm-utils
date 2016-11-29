@@ -144,13 +144,12 @@ class BaseExporter(BaseConsumer):
         self._send_response_message(STATUS_SUCCESS if self.result.success else STATUS_FAILURE, self.routing_key,
                                     export_id, self.result)
 
-    @staticmethod
-    def _file_fix(filepath, prefix=None, suffix=None):
+    def _file_fix(self, filepath, prefix=None, suffix=None):
         """
         create a temp file to save the large file object, don't
         need to load file to memory
         """
-        with tempfile.NamedTemporaryFile(dir='.', delete=False) as outfile:
+        with tempfile.NamedTemporaryFile(dir=self.working_path, delete=False) as outfile:
             if prefix:
                 outfile.write(prefix)
             shutil.copyfileobj(file(filepath, 'r'), outfile)
