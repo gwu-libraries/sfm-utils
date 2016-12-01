@@ -44,7 +44,7 @@ class TestExporter(tests.TestCase):
         mock_table_cls = MagicMock()
         mock_table = MagicMock(spec=BaseTable)
         mock_table_cls.side_effect = [mock_table]
-        mock_table.__iter__ = Mock(return_value=iter([("key1", "key2"), ("k1v1", "k2v1"), ("k1v2", "k2v2")]))
+        mock_table.__iter__ = Mock(return_value=iter([[("key1", "key2"), ("k1v1", "k2v1"), ("k1v2", "k2v2")], ]))
 
         mock_api_client = MagicMock(spec=ApiClient)
         mock_api_client_cls.side_effect = [mock_api_client]
@@ -70,6 +70,7 @@ class TestExporter(tests.TestCase):
                 "id": "005b131f5f854402afa2b08a4b7ba960"
             },
             "format": "csv",
+            "segment_size": None,
             "path": self.export_path,
             "dedupe": True,
             "item_date_start": item_date_start,
@@ -94,10 +95,11 @@ class TestExporter(tests.TestCase):
                                                       collection_id="005b131f5f854402afa2b08a4b7ba960",
                                                       seed_ids=[], harvest_date_start=harvest_date_start,
                                                       harvest_date_end=harvest_date_end)
-        mock_table_cls.assert_called_once_with(self.warc_filepaths, True, item_datetime_start, item_datetime_end, [])
+        mock_table_cls.assert_called_once_with(self.warc_filepaths, True, item_datetime_start,
+                                               item_datetime_end, [], None)
 
         self.assertTrue(exporter.result.success)
-        csv_filepath = os.path.join(self.export_path, "test1.csv")
+        csv_filepath = os.path.join(self.export_path, "test1_001.csv")
         self.assertTrue(os.path.exists(csv_filepath))
         with open(csv_filepath, "r") as f:
             lines = f.readlines()
@@ -134,7 +136,7 @@ class TestExporter(tests.TestCase):
         mock_table_cls = MagicMock()
         mock_table = MagicMock(spec=BaseTable)
         mock_table_cls.side_effect = [mock_table]
-        mock_table.__iter__ = Mock(return_value=iter([("key1", "key2"), ("k1v1", "k2v1"), ("k1v2", "k2v2")]))
+        mock_table.__iter__ = Mock(return_value=iter([[("key1", "key2"), ("k1v1", "k2v1"), ("k1v2", "k2v2")], ]))
         mock_table.id_field.return_value = "key2"
 
         mock_api_client = MagicMock(spec=ApiClient)
@@ -154,6 +156,7 @@ class TestExporter(tests.TestCase):
                 "id": "005b131f5f854402afa2b08a4b7ba960"
             },
             "format": "dehydrate",
+            "segment_size": None,
             "path": self.export_path,
 
         }
@@ -172,10 +175,10 @@ class TestExporter(tests.TestCase):
         mock_api_client.warcs.assert_called_once_with(exclude_web=True,
                                                       collection_id="005b131f5f854402afa2b08a4b7ba960",
                                                       seed_ids=[], harvest_date_end=None, harvest_date_start=None)
-        mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, [])
+        mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, [], None)
 
         self.assertTrue(exporter.result.success)
-        txt_filepath = os.path.join(self.export_path, "test1.txt")
+        txt_filepath = os.path.join(self.export_path, "test1_001.txt")
         self.assertTrue(os.path.exists(txt_filepath))
         with open(txt_filepath, "r") as f:
             lines = f.readlines()
@@ -195,7 +198,7 @@ class TestExporter(tests.TestCase):
         mock_table_cls = MagicMock()
         mock_table = MagicMock(spec=BaseTable)
         mock_table_cls.side_effect = [mock_table]
-        mock_table.__iter__ = Mock(return_value=iter([("key1", "key2"), ("k1v1", "k2v1"), ("k1v2", "k2v2")]))
+        mock_table.__iter__ = Mock(return_value=iter([[("key1", "key2"), ("k1v1", "k2v1"), ("k1v2", "k2v2")], ]))
 
         mock_api_client = MagicMock(spec=ApiClient)
         mock_api_client_cls.side_effect = [mock_api_client]
@@ -215,6 +218,7 @@ class TestExporter(tests.TestCase):
                 },
             ],
             "format": "csv",
+            "segment_size": None,
             "path": self.export_path,
         }
 
@@ -230,10 +234,10 @@ class TestExporter(tests.TestCase):
                                                       seed_ids=["005b131f5f854402afa2b08a4b7ba960",
                                                                 "105b131f5f854402afa2b08a4b7ba960"],
                                                       harvest_date_start=None, harvest_date_end=None)
-        mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, ["uid1", "uid2"])
+        mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, ["uid1", "uid2"], None)
 
         self.assertTrue(exporter.result.success)
-        csv_filepath = os.path.join(self.export_path, "test2.csv")
+        csv_filepath = os.path.join(self.export_path, "test2_001.csv")
         self.assertTrue(os.path.exists(csv_filepath))
         with open(csv_filepath, "r") as f:
             lines = f.readlines()
@@ -257,6 +261,7 @@ class TestExporter(tests.TestCase):
                 }
             ],
             "format": "csv",
+            "segment_size": None,
             "path": self.export_path
         }
 
@@ -297,6 +302,7 @@ class TestExporter(tests.TestCase):
                 "id": "005b131f5f854402afa2b08a4b7ba960"
             },
             "format": "csv",
+            "segment_size": None,
             "path": self.export_path
         }
 
@@ -336,24 +342,66 @@ class TestExporter(tests.TestCase):
             IterItem(None, None, None, None, {"key1": "k1v1", "key2": "k2v1", "key3": "k3v1"}),
             IterItem(None, None, None, None, {"key1": "k1v2", "key2": "k2v2", "key3": "k3v2"})]
 
-        export_filepath = os.path.join(self.export_path, "test.json")
+        export_filepath = os.path.join(self.export_path, "test")
         now = datetime.datetime.now()
         limit_uids = [11, 14]
 
         exporter = BaseExporter(None, mock_warc_iter_cls, None, self.working_path, warc_base_path=self.warc_base_path,
                                 host="testhost")
 
-        exporter._full_json_export(self.warcs, export_filepath, True, now, None, limit_uids)
+        exporter._full_json_export(self.warcs, export_filepath, True, now, None, limit_uids, None)
 
         mock_warc_iter_cls.assert_called_once_with(self.warcs, limit_uids)
         mock_warc_iter.iter.assert_called_once_with(dedupe=True, item_date_start=now, item_date_end=None,
                                                     limit_item_types=None)
 
-        self.assertTrue(os.path.exists(export_filepath))
-        with open(export_filepath, "r") as f:
+        file_path = export_filepath + '_001.json'
+        self.assertTrue(os.path.exists(file_path))
+        with open(file_path, "r") as f:
             lines = f.readlines()
         self.assertEqual(2, len(lines))
         self.assertDictEqual({"key1": "k1v1", "key2": "k2v1", "key3": "k3v1"}, json.loads(lines[0]))
+
+    def test_export_full_json_segment(self):
+        mock_warc_iter_cls = MagicMock()
+        mock_warc_iter = MagicMock()
+        mock_warc_iter_cls.side_effect = [mock_warc_iter]
+        mock_warc_iter.iter.return_value = [
+            IterItem(None, None, None, None, {"key1": "k1v1", "key2": "k2v1", "key3": "k3v1"}),
+            IterItem(None, None, None, None, {"key1": "k1v2", "key2": "k2v2", "key3": "k3v2"}),
+            IterItem(None, None, None, None, {"key1": "k1v3", "key2": "k2v3", "key3": "k3v3"}),
+            IterItem(None, None, None, None, {"key1": "k1v4", "key2": "k2v4", "key3": "k3v4"}),
+            IterItem(None, None, None, None, {"key1": "k1v5", "key2": "k2v5", "key3": "k3v5"}),
+            IterItem(None, None, None, None, {"key1": "k1v6", "key2": "k2v6", "key3": "k3v6"}),
+            IterItem(None, None, None, None, {"key1": "k1v7", "key2": "k2v7", "key3": "k3v7"})]
+
+        export_filepath = os.path.join(self.export_path, "test")
+        now = datetime.datetime.now()
+        limit_uids = [11, 14]
+
+        exporter = BaseExporter(None, mock_warc_iter_cls, None, self.working_path, warc_base_path=self.warc_base_path,
+                                host="testhost")
+
+        exporter._full_json_export(self.warcs, export_filepath, True, now, None, limit_uids, 3)
+
+        mock_warc_iter_cls.assert_called_once_with(self.warcs, limit_uids)
+        mock_warc_iter.iter.assert_called_once_with(dedupe=True, item_date_start=now, item_date_end=None,
+                                                    limit_item_types=None)
+
+        # file test_1.json, test_2.json , test_3.json
+        for idx in xrange(3):
+            file_path = export_filepath + '_' + str(idx + 1).zfill(3) + '.json'
+            self.assertTrue(os.path.exists(file_path))
+            with open(file_path, "r") as f:
+                lines = f.readlines()
+            # the test_3.json only has 1 row
+            if idx == 2:
+                self.assertEqual(1, len(lines))
+            else:
+                self.assertEqual(3, len(lines))
+            self.assertDictEqual(
+                {"key1": "k1v" + str(1 + idx * 3), "key2": "k2v" + str(1 + idx * 3), "key3": "k3v" + str(1 + idx * 3)},
+                json.loads(lines[0]))
 
 
 class TestableTable(BaseTable):
@@ -375,26 +423,45 @@ class TestBaseTable(tests.TestCase):
         mock_warc_iter_cls.side_effect = [mock_warc_iter]
         mock_warc_iter.iter.return_value = [
             IterItem(None, None, None, None, {"key1": "k1v1", "key2": "k2v1", "key3": "k3v1"}),
-            IterItem(None, None, None, None, {"key1": "k1v2", "key2": "k2v2", "key3": "k3v2"})]
+            IterItem(None, None, None, None, {"key1": "k1v2", "key2": "k2v2", "key3": "k3v2"}),
+            IterItem(None, None, None, None, {"key1": "k1v3", "key2": "k2v3", "key3": "k3v3"}),
+            IterItem(None, None, None, None, {"key1": "k1v4", "key2": "k2v4", "key3": "k3v4"}),
+            IterItem(None, None, None, None, {"key1": "k1v5", "key2": "k2v5", "key3": "k3v5"}),
+            IterItem(None, None, None, None, {"key1": "k1v6", "key2": "k2v6", "key3": "k3v6"}),
+            IterItem(None, None, None, None, {"key1": "k1v7", "key2": "k2v7", "key3": "k3v7"})]
         now = datetime.datetime.now()
         limit_uids = [11, 14]
 
-        table = TestableTable(self.warc_paths, True, now, None, limit_uids, mock_warc_iter_cls)
+        tables = TestableTable(self.warc_paths, True, now, None, limit_uids, mock_warc_iter_cls, segment_row_size=2)
+        chunk_cnt = 0
+        for idx, table in enumerate(tables):
+            chunk_cnt += 1
+            for count, row in enumerate(table):
+                # every chunk should start with header row
+                if count == 0:
+                    # Header row
+                    # Just testing first and last, figuring these might change often.
+                    self.assertEqual("key1", row[0])
+                    self.assertEqual("key2", row[1])
+                    self.assertEqual("key3", row[2])
+                # chunk 1 and row 2
+                if idx == 0 and count == 1:
+                    # First row
+                    self.assertEqual("k1v1", row[0])
+                    self.assertEqual("k2v1", row[1])
+                    self.assertEqual("k3v1", row[2])
+                # chunk 3 and row 3
+                if idx == 2 and count == 2:
+                    self.assertEqual("k1v6", row[0])
+                    self.assertEqual("k2v6", row[1])
+                    self.assertEqual("k3v6", row[2])
+                # chunk 4 and row 2
+                if idx == 3 and count == 1:
+                    self.assertEqual("k1v7", row[0])
+                    self.assertEqual("k2v7", row[1])
+                    self.assertEqual("k3v7", row[2])
 
-        count = 0
-        for count, row in enumerate(table):
-            if count == 0:
-                # Header row
-                # Just testing first and last, figuring these might change often.
-                self.assertEqual("key1", row[0])
-                self.assertEqual("key2", row[1])
-                self.assertEqual("key3", row[2])
-            if count == 1:
-                # First row
-                self.assertEqual("k1v1", row[0])
-                self.assertEqual("k2v1", row[1])
-                self.assertEqual("k3v1", row[2])
-        self.assertEqual(2, count)
+        self.assertEqual(4, chunk_cnt)
 
         mock_warc_iter_cls.assert_called_with(self.warc_paths, limit_uids)
         mock_warc_iter.iter.assert_called_once_with(dedupe=True, item_date_end=None, item_date_start=now,
