@@ -156,6 +156,7 @@ class BaseHarvester(BaseConsumer):
 
         # Possibly resume a harvest
         self.result = HarvestResult()
+        self.result.started = datetime.datetime.now()
 
         if os.path.exists(self.result_filepath) or len(self._list_warcs(self.warc_temp_dir)) > 0:
             self._load_result()
@@ -165,7 +166,6 @@ class BaseHarvester(BaseConsumer):
             self._send_status_message(STATUS_RUNNING)
             self._queue_warc_files()
         else:
-            self.result.started = datetime.datetime.now()
             # Send a status message. This will give immediate indication that harvesting is occurring.
             self._send_status_message(STATUS_RUNNING)
 
