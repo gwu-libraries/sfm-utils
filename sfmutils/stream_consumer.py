@@ -40,7 +40,7 @@ class StreamConsumer(BaseConsumer):
         self.debug_warcprox = debug_warcprox
         self.tries = tries
         self._supervisor = HarvestSupervisor(script, mq_config.host, mq_config.username, mq_config.password,
-                                             working_path, debug=debug)
+                                             working_path, debug=debug, process_owner="sfm")
 
     def on_message(self):
         harvest_id = self.message["id"]
