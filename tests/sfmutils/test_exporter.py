@@ -8,7 +8,8 @@ import iso8601
 from sfmutils.exporter import BaseTable, BaseExporter, CODE_WARC_MISSING, CODE_NO_WARCS, CODE_BAD_REQUEST
 from sfmutils.api_client import ApiClient
 from sfmutils.warc_iter import IterItem
-import datetime
+from sfmutils.utils import datetime_now
+
 from kombu import Producer, Connection, Exchange
 
 
@@ -343,7 +344,7 @@ class TestExporter(tests.TestCase):
             IterItem(None, None, None, None, {"key1": "k1v2", "key2": "k2v2", "key3": "k3v2"})]
 
         export_filepath = os.path.join(self.export_path, "test")
-        now = datetime.datetime.now()
+        now = datetime_now()
         limit_uids = [11, 14]
 
         exporter = BaseExporter(None, mock_warc_iter_cls, None, self.working_path, warc_base_path=self.warc_base_path,
@@ -376,7 +377,7 @@ class TestExporter(tests.TestCase):
             IterItem(None, None, None, None, {"key1": "k1v7", "key2": "k2v7", "key3": "k3v7"})]
 
         export_filepath = os.path.join(self.export_path, "test")
-        now = datetime.datetime.now()
+        now = datetime_now()
         limit_uids = [11, 14]
 
         exporter = BaseExporter(None, mock_warc_iter_cls, None, self.working_path, warc_base_path=self.warc_base_path,
@@ -429,7 +430,7 @@ class TestBaseTable(tests.TestCase):
             IterItem(None, None, None, None, {"key1": "k1v5", "key2": "k2v5", "key3": "k3v5"}),
             IterItem(None, None, None, None, {"key1": "k1v6", "key2": "k2v6", "key3": "k3v6"}),
             IterItem(None, None, None, None, {"key1": "k1v7", "key2": "k2v7", "key3": "k3v7"})]
-        now = datetime.datetime.now()
+        now = datetime_now()
         limit_uids = [11, 14]
 
         tables = TestableTable(self.warc_paths, True, now, None, limit_uids, mock_warc_iter_cls, segment_row_size=2)

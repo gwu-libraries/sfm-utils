@@ -20,7 +20,7 @@ from Queue import Queue, Empty
 from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
 from sfmutils.state_store import JsonHarvestStateStore, DelayedSetStateStoreAdapter
 from sfmutils.warcprox import warced
-from sfmutils.utils import safe_string
+from sfmutils.utils import safe_string, datetime_from_stamp, datetime_now
 from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING
 
 log = logging.getLogger(__name__)
@@ -156,12 +156,12 @@ class BaseHarvester(BaseConsumer):
 
         # Possibly resume a harvest
         self.result = HarvestResult()
-        self.result.started = datetime.datetime.now()
+        self.result.started = datetime_now()
 
         if os.path.exists(self.result_filepath) or len(self._list_warcs(self.warc_temp_dir)) > 0:
             self._load_result()
             self.result.warnings.append(
-                Msg(CODE_HARVEST_RESUMED, "Harvest resumed on {}".format(datetime.datetime.now())))
+                Msg(CODE_HARVEST_RESUMED, "Harvest resumed on {}".format(datetime_now())))
             # Send a status message. This will give immediate indication that harvesting is occurring.
             self._send_status_message(STATUS_RUNNING)
             self._queue_warc_files()
@@ -274,7 +274,7 @@ class BaseHarvester(BaseConsumer):
         log.debug("Waiting for processing to complete.")
         self.warc_processing_queue.join()
         log.debug("Processing complete.")
-        self.result.ended = datetime.datetime.now()
+        self.result.ended = datetime_now()
 
         # Send final message
         self._send_status_message(STATUS_SUCCESS if self.result.success else STATUS_FAILURE)
@@ -416,7 +416,7 @@ class BaseHarvester(BaseConsumer):
             "warc": {
                 "id": uuid.uuid4().hex,
                 "path": warc_path,
-                "date_created": datetime.datetime.fromtimestamp(os.path.getctime(warc_path)).isoformat(),
+                "date_created": datetime_from_stamp(os.path.getctime(warc_path)).isoformat(),
                 "bytes": os.path.getsize(warc_path),
                 "sha1": hashlib.sha1(open(warc_path).read()).hexdigest()
             }
