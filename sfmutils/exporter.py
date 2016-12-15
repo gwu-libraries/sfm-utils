@@ -4,7 +4,6 @@ import logging
 import os
 import json
 from json.encoder import JSONEncoder
-import datetime
 import petl
 from petl.util.base import dicts as _dicts
 from petl.io.sources import write_source_from_arg
@@ -16,6 +15,7 @@ import shutil
 import tempfile
 import re
 from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING
+from sfmutils.utils import datetime_from_stamp, datetime_now
 from itertools import islice
 
 log = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ class BaseExporter(BaseConsumer):
         log.info("Performing export %s", export_id)
 
         self.result = ExportResult()
-        self.result.started = datetime.datetime.now()
+        self.result.started = datetime_now()
 
         # Send status indicating that it is running
         self._send_response_message(STATUS_RUNNING, self.routing_key, export_id, self.result)
@@ -140,7 +140,7 @@ class BaseExporter(BaseConsumer):
             self.result.errors.append(Msg(CODE_BAD_REQUEST, "Request export of a seed or collection."))
             self.result.success = False
 
-        self.result.ended = datetime.datetime.now()
+        self.result.ended = datetime_now()
         self._send_response_message(STATUS_SUCCESS if self.result.success else STATUS_FAILURE, self.routing_key,
                                     export_id, self.result)
 
