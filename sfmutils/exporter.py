@@ -17,6 +17,7 @@ import re
 from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING
 from sfmutils.utils import datetime_from_stamp, datetime_now
 from itertools import islice
+import xlsxwriter
 
 log = logging.getLogger(__name__)
 
@@ -374,3 +375,20 @@ def to_lineoriented_json(table, source):
             for chunk in encoder.iterencode(d):
                 f.write(chunk)
             f.write("\n")
+
+
+def to_xlsx(table,source):
+    """
+    Using xlsxwrite table to xlsx, using openpyxl has memory issue.
+    """
+    workbook = xlsxwriter.Workbook(source, {'constant_memory': True})
+    worksheet = workbook.add_worksheet()
+
+    for idx, row in enumerate(table):
+        for idy, col in enumerate(row):
+            if hasattr(col, 'isoformat'):
+                worksheet.write(idx, idy, col.isoformat())
+            else:
+                worksheet.write(idx, idy, col)
+
+    workbook.close()
