@@ -17,6 +17,7 @@ import re
 from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING
 from sfmutils.utils import datetime_from_stamp, datetime_now
 from itertools import islice
+import xlsxwriter
 
 log = logging.getLogger(__name__)
 
@@ -97,7 +98,7 @@ class BaseExporter(BaseConsumer):
                     "csv": ("csv", petl.tocsv),
                     "tsv": ("tsv", petl.totsv),
                     "html": ("html", petl.tohtml),
-                    "xlsx": ("xlsx", petl.toxlsx),
+                    "xlsx": ("xlsx", to_xlsx),
                     "json": ("json", to_lineoriented_json)
                 }
                 # Other possibilities: XML, databases, HDFS
@@ -374,3 +375,26 @@ def to_lineoriented_json(table, source):
             for chunk in encoder.iterencode(d):
                 f.write(chunk)
             f.write("\n")
+
+
+def to_xlsx(table,source):
+    """
+    Using xlsxwriter write table elements to xlsx since openpyxl has memory issue.
+    """
+    # constant_memory: write to xlsx in constant memory mode
+    # strings_to_formulas: write string as formulas, solve issue like #514
+    # strings_to_urls: write string start with 'http' as urls, add link to that url
+    workbook = xlsxwriter.Workbook(source, {'constant_memory': True,
+                                            'strings_to_formulas': False,
+                                            'strings_to_urls': False})
+    worksheet = workbook.add_worksheet()
+
+    for idx, row in enumerate(table):
+        for idy, col in enumerate(row):
+            # xlsxwriter can't directly write date object with timezone info
+            if hasattr(col, 'isoformat'):
+                worksheet.write(idx, idy, col.isoformat())
+            else:
+                worksheet.write(idx, idy, col)
+
+    workbook.close()
