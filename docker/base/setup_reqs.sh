@@ -9,7 +9,7 @@ if [ ! -d $CONTAINER_DIR ]; then
     chown sfm:sfm $CONTAINER_DIR
 fi
 
-if [ $SFM_UPGRADE_REQS != "False" ]; then
+if [ ${SFM_UPGRADE_REQS=True} != "False" ]; then
     echo "Upgrading common.txt"
     pip install -r requirements/common.txt --upgrade
 fi
