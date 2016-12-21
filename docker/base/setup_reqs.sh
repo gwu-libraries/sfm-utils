@@ -9,8 +9,10 @@ if [ ! -d $CONTAINER_DIR ]; then
     chown sfm:sfm $CONTAINER_DIR
 fi
 
-echo "Upgrading common.txt"
-pip install -r requirements/common.txt --upgrade
+if [ $SFM_UPGRADE_REQS != "False" ]; then
+    echo "Upgrading common.txt"
+    pip install -r requirements/common.txt --upgrade
+fi
 
 if [ $SFM_REQS != "release" ]; then
     echo "Uninstalling requirements.txt."
