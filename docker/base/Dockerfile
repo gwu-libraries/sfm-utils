@@ -22,6 +22,8 @@ RUN apt-get update && apt-get install -y \
 
 #pip set in 7.1.2
 RUN pip install pip==7.1.2
+#consider upgrade pip
+RUN pip install --upgrade pip
 #Avoid the warning of https
 RUN pip install --upgrade ndg-httpsclient
 RUN pip install appdeps
