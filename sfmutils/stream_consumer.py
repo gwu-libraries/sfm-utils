@@ -5,6 +5,7 @@ import socket
 import logging
 import json
 import argparse
+import signal
 from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
 from sfmutils.supervisor import HarvestSupervisor
 
@@ -42,6 +43,17 @@ class StreamConsumer(BaseConsumer):
         self._supervisor = HarvestSupervisor(script, mq_config.host, mq_config.username, mq_config.password,
                                              working_path, debug=debug, process_owner="sfm")
 
+        # Shutdown Supervisor.
+        def shutdown(signal_number, stack_frame):
+            log.debug("Shutdown triggered")
+            self._supervisor.pause_all()
+            self.should_stop = True
+        log.debug("Registering shutdown signal")
+
+        signal.signal(signal.SIGTERM, shutdown)
+        signal.signal(signal.SIGINT, shutdown)
+
+
     def on_message(self):
         harvest_id = self.message["id"]
         if self.routing_key.startswith("harvest.start."):
@@ -53,7 +65,7 @@ class StreamConsumer(BaseConsumer):
         else:
             # Stop
             log.info("Stopping %s", harvest_id)
-            self._supervisor.stop(harvest_id)
+            self._supervisor.remove(harvest_id)
 
 
 if __name__ == "__main__":

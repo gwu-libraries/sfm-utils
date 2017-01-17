@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 import logging
-import datetime
 import json
 import shutil
 import hashlib
@@ -21,7 +20,7 @@ from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
 from sfmutils.state_store import JsonHarvestStateStore, DelayedSetStateStoreAdapter
 from sfmutils.warcprox import warced
 from sfmutils.utils import safe_string, datetime_from_stamp, datetime_now
-from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING
+from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING, STATUS_PAUSED
 
 log = logging.getLogger(__name__)
 
@@ -142,6 +141,8 @@ class BaseHarvester(BaseConsumer):
         self.warc_processing_thread.daemon = True
         self.warc_processing_thread.start()
         self.host = host or os.environ.get("HOSTNAME", "localhost")
+        # Indicates that the next shutdown should be treated as a pause of the harvest, rather than a completion.
+        self.is_pause = False
 
     def on_message(self):
         assert self.message
@@ -179,6 +180,8 @@ class BaseHarvester(BaseConsumer):
         # is finished. This may take some time.
         def shutdown(signal_number, stack_frame):
             log.debug("Shutdown triggered")
+            if self.is_pause:
+                log.debug("This will be a pause of the harvest.")
             self.stop_harvest_loop_event.set()
             # stop_event tells the harvester to stop harvest_seeds.
             # This will allow warcprox to exit.
@@ -190,6 +193,11 @@ class BaseHarvester(BaseConsumer):
 
         signal.signal(signal.SIGTERM, shutdown)
         signal.signal(signal.SIGINT, shutdown)
+
+        def pause(signal_number, stack_frame):
+            self.is_pause = True
+
+        signal.signal(signal.SIGUSR1, pause)
 
         log.debug("Message is %s" % json.dumps(self.message, indent=4))
 
@@ -274,14 +282,21 @@ class BaseHarvester(BaseConsumer):
         log.debug("Waiting for processing to complete.")
         self.warc_processing_queue.join()
         log.debug("Processing complete.")
-        self.result.ended = datetime_now()
 
-        # Send final message
-        self._send_status_message(STATUS_SUCCESS if self.result.success else STATUS_FAILURE)
+        if not self.is_pause:
+            self.result.ended = datetime_now()
 
-        # Delete result file
-        if os.path.exists(self.result_filepath):
-            os.remove(self.result_filepath)
+            # Send final message
+            self._send_status_message(STATUS_SUCCESS if self.result.success else STATUS_FAILURE)
+
+            # Delete result file
+            if os.path.exists(self.result_filepath):
+                os.remove(self.result_filepath)
+        else:
+            log.info("Pausing this harvest.")
+
+            # Send final message
+            self._send_status_message(STATUS_PAUSED)
 
     def _queue_warc_files(self):
         log.debug("Queueing WARC files")

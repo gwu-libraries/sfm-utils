@@ -41,11 +41,13 @@ class SubProcess(object):
             log.debug("Waiting for %s to terminate", self.name)
             self.proc.wait()
             log.debug("%s terminated", self.name)
+            self.proc = None
         except Exception:
             try:
                 log.debug("Killing %s", self.name)
                 self.proc.kill()
                 log.debug("Killed %s", self.name)
+                self.proc = None
             except Exception:
                 pass
 

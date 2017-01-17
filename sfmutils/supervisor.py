@@ -44,8 +44,8 @@ class HarvestSupervisor:
         log.info("Starting %s: %s", routing_key, harvest_start_message)
         harvest_id = harvest_start_message["id"]
 
-        # Stop existing
-        self.stop(harvest_id)
+        # Remove existing
+        self.remove(harvest_id)
 
         # Write seed file
         with open(self._get_seed_filepath(harvest_id), 'w') as f:
@@ -61,8 +61,8 @@ class HarvestSupervisor:
         self._reload_config()
         self._add_process_group(harvest_id)
 
-    def stop(self, harvest_id):
-        log.info("Stopping %s", harvest_id)
+    def remove(self, harvest_id):
+        log.info("Removing %s", harvest_id)
 
         # Remove process group
         self._remove_process_group(harvest_id)
@@ -78,6 +78,13 @@ class HarvestSupervisor:
         if os.path.exists(seed_filepath):
             log.debug("Deleting seed %s", seed_filepath)
             os.remove(seed_filepath)
+
+    def pause_all(self):
+        log.info("Pausing all")
+        # Sending USR1 to tell the harvester that SIGTERM should trigger a pause of the harvest, not an end.
+        # For a pause, will attempt to cleanly exit without completing harvest.
+        self._get_supervisor_proxy().supervisor.signalAllProcesses("USR1")
+        self._get_supervisor_proxy().supervisor.stopAllProcesses()
 
     def _create_conf_file(self, harvest_id, debug, debug_warcprox, tries):
         # Note that giving a long time to shutdown.

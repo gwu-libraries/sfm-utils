@@ -24,7 +24,7 @@ class TestStreamConsumer(TestCase):
                                                                      "harvest.start.test.test_search"]}), )
 
     def tearDown(self):
-        self.patcher.stop()
+        # self.patcher.remove()
         if os.path.exists(self.working_path):
             shutil.rmtree(self.working_path)
 
@@ -49,7 +49,7 @@ class TestStreamConsumer(TestCase):
 
         self.mock_supervisor.start.called_once_with(message, "harvest.start.test.test_usertimeline")
 
-    def test_stop(self):
+    def test_remove(self):
         message = {
             "id": "test:1"
         }
@@ -58,4 +58,4 @@ class TestStreamConsumer(TestCase):
         self.stream_consumer.routing_key = "harvest.stop.test.test_usertimeline"
         self.stream_consumer.on_message()
 
-        self.mock_supervisor.stop.called_once_with("test:1")
+        self.mock_supervisor.remove.called_once_with("test:1")
