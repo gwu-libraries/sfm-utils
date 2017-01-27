@@ -361,7 +361,8 @@ class BaseHarvester(BaseConsumer):
                 }
             }
             for url in urls_set:
-                message["seeds"].append({"token": url})
+                if url:
+                    message["seeds"].append({"token": url})
 
             self._publish_message("harvest.start.web", message, trunate_debug_length=5000)
         else:
