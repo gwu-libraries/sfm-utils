@@ -399,7 +399,8 @@ class BaseHarvester(BaseConsumer):
         status_routing_key = self.routing_key.replace("start", "status")
         self._publish_message(status_routing_key, message)
 
-    def _clean_name(self, name):
+    @staticmethod
+    def _clean_name(name):
         re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', name)
 
     def _send_warc_created_message(self, warc_path):
