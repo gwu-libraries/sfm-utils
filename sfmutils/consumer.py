@@ -128,17 +128,22 @@ class BaseConsumer(ConsumerProducerMixin):
         self.routing_key = message_obj.delivery_info["routing_key"]
         self.message = message
 
-        # Persist the message
-        if self.persist_messages:
-            with codecs.open(self.message_filepath, 'w') as f:
-                json.dump({
-                    "routing_key": self.routing_key,
-                    "message": self.message
-                }, f)
-            log.debug("Persisted message to %s", self.message_filepath)
-
         # Acknowledge the message
         message_obj.ack()
+
+        # Persist the message
+        if self.persist_messages:
+            try:
+                with codecs.open(self.message_filepath, 'w', encoding="utf-8") as f:
+                    json.dump({
+                        "routing_key": self.routing_key,
+                        "message": self.message
+                    }, f)
+                log.debug("Persisted message to %s", self.message_filepath)
+            except Exception as e:
+                log.error("Error persisting message to %s", self.message_filepath)
+                self.on_persist_exception(e)
+                return
 
         # Don't want to get in a loop, so when an exception occurs, delete the message.
         try:
@@ -148,6 +153,14 @@ class BaseConsumer(ConsumerProducerMixin):
             if self.persist_messages and os.path.exists(self.message_filepath):
                 os.remove(self.message_filepath)
                 log.debug("Deleted %s", self.message_filepath)
+
+    def on_persist_exception(self, exception):
+        """
+        Called when an exception is thrown persisting a message.
+
+        self.routing_key and self.message will be set.
+        """
+        pass
 
     def on_message(self):
         """
