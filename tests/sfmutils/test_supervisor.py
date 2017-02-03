@@ -88,7 +88,7 @@ stdout_logfile={log_path}/test_1.out.log
         mock_supervisor3.addProcessGroup.assert_called_once_with("test_1")
 
         # Now stop
-        supervisor.stop("test:1")
+        supervisor.remove("test:1")
         # Remove process called
         mock_supervisor4.stopProcess.assert_called_once_with("test_1", True)
         mock_supervisor4.removeProcessGroup.assert_called_once_with("test_1")
