@@ -12,14 +12,16 @@ from sfmutils.consumer import BaseConsumer
 
 
 class TestableConsumer(BaseConsumer):
-    def __init__(self, working_path, raise_exception=False):
+    def __init__(self, working_path, raise_exception=False, cause_persist_exception=False):
         BaseConsumer.__init__(self, persist_messages=True, working_path=working_path)
         self.raise_exception = raise_exception
         self.on_message_called = False
-        self.on_message_called = None
         self.on_message_message = None
         self.on_message_routing_key = None
         self.on_message_file_message = None
+        if cause_persist_exception:
+            self.message_filepath = None
+        self.on_persist_exception_called = False
 
     def on_message(self):
         self.on_message_called = True
@@ -29,6 +31,9 @@ class TestableConsumer(BaseConsumer):
             self.on_message_file_message = json.load(f)
         if self.raise_exception:
             raise Exception
+
+    def on_persist_exception(self, exception):
+        self.on_persist_exception_called = True
 
 
 class TestBaseConsumer(tests.TestCase):
@@ -71,6 +76,17 @@ class TestBaseConsumer(tests.TestCase):
         self.assertEqual(self.routing_key, consumer.on_message_routing_key)
         self.assertFalse(os.path.exists(self.message_filepath))
         self.assertEqual(self.message_file, consumer.on_message_file_message)
+
+    def test_callback_persist_exception(self):
+        consumer = TestableConsumer(self.working_path, cause_persist_exception=True)
+        mock_mq_message = MagicMock(spec=Message)
+        mock_mq_message.delivery_info = {"routing_key": self.routing_key}
+        consumer._callback(self.message, mock_mq_message)
+
+        self.assertFalse(consumer.on_message_called)
+        self.assertTrue(consumer.on_persist_exception_called)
+        self.assertIsNotNone(self.message)
+        self.assertIsNotNone(self.routing_key)
 
     def test_message_from_file(self):
         self._write_message_file()

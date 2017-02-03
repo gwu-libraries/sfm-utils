@@ -103,6 +103,8 @@ CODE_UID_NOT_FOUND = "uid_not_found"
 CODE_TOKEN_UNAUTHORIZED = "token_unauthorized"
 # A resume occurred
 CODE_HARVEST_RESUMED = "harvest_resumed"
+# Error during persisting message
+CODE_MSG_PERSIST_ERROR ="msg_persist_error"
 
 
 class BaseHarvester(BaseConsumer):
@@ -549,6 +551,24 @@ class BaseHarvester(BaseConsumer):
             # Mark this as done.
             self.warc_processing_queue.task_done()
         log.debug("Exiting warc processing thread")
+
+    def on_persist_exception(self, exception):
+        log.error("Handling on persist exception for %s", self.message["id"])
+        message = {
+            "id": self.message["id"],
+            "status": STATUS_FAILURE,
+            "errors": [Msg(CODE_MSG_PERSIST_ERROR, str(exception)).to_map()],
+            "date_started": datetime_now().isoformat(),
+            "date_ended": datetime_now().isoformat(),
+            # This will add spaces before caps
+            "service": re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', self.__class__.__name__),
+            "host": self.host,
+            "instance": str(os.getpid())
+        }
+
+        # Routing key may be none
+        status_routing_key = self.routing_key.replace("start", "status")
+        self._publish_message(status_routing_key, message)
 
     def process_warc(self, warc_filepath):
         """

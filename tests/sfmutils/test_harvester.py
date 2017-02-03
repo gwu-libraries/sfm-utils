@@ -575,6 +575,68 @@ class TestBaseHarvester(TestCase):
         # Check state store
         self.assert_state_store(1)
 
+    # Mock out Producer
+    @patch("sfmutils.consumer.Producer", autospec=True)
+    def test_on_persist_exception(self, mock_producer_class):
+        # Setup
+        mock_connection = MagicMock(spec=Connection)
+        mock_exchange = MagicMock(spec=Exchange)
+        mock_exchange.name = "test exchange"
+        mock_producer = MagicMock(spec=Producer)
+        mock_producer_class.return_value = mock_producer
+        mock_warced = MagicMock(spec=warced)
+        # mock_warced_class.side_effect = [mock_warced]
+        # mock_message = MagicMock(spec=Message)
+        # mock_message.delivery_info = {"routing_key": "harvest.start.test.test_usertimeline"}
+
+        # Create harvester and invoke _callback
+        harvester = TestableHarvester(self.working_path, mock_connection, mock_exchange)
+        # harvester._callback(self.message, mock_message)
+        harvester.message = self.message
+        harvester.routing_key = "harvest.start.test.test_usertimeline"
+        harvester.on_persist_exception(Exception("Problem persisting"))
+
+        # Should be a harvest status message.
+
+        # # Test assertions
+        # self.assertEqual(1, harvester.harvest_seed_call_count)
+        # self.assertEqual(1, harvester.process_warc_call_count)
+        #
+        # mock_warced_class.assert_called_once_with("test_1", harvester.warc_temp_dir, debug=False, interrupt=False,
+        #                                           rollover_time=120)
+        # self.assertTrue(mock_warced.__enter__.called)
+        # self.assertTrue(mock_warced.__exit__.called)
+        #
+        # # Warc path deleted
+        # self.assertFalse(os.path.exists(harvester.warc_temp_dir))
+        #
+        # # Warcs moved
+        # # This tests 2015/11/09/19/test_1-20151109195229879-00001-97528-GLSS-F0G5RP-8000.warc.gz
+        # self.assert_warcs_moved(1, 2)
+        #
+        # # Messages
+        # self.assert_first_running_harvest_status(*mock_producer.mock_calls[0])
+        # self.assert_web_harvest(1, *mock_producer.mock_calls[1])
+        # self.assert_warc_created_message(1, *mock_producer.mock_calls[2])
+        #
+        # # The first one has errors, infos, warnings, token updates, uids
+        # self.assert_second_running_harvest_status(*mock_producer.mock_calls[3])
+        #
+        # self.assert_completed_harvest_status(1, *mock_producer.mock_calls[4])
+        #
+        # # Check state store
+        # self.assert_state_store(1)
+
+        # Running harvest result message
+        (name, _, kwargs) = mock_producer.mock_calls[0]
+        self.assertEqual("publish", name)
+        self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
+        harvest_result_message = kwargs["body"]
+        self.assertEqual(harvest_result_message["id"], "test:1")
+        self.assertEqual(harvest_result_message["status"], STATUS_FAILURE)
+        self.assertEqual(1, len(harvest_result_message["errors"]))
+        self.assertIsNotNone(iso8601.parse_date(harvest_result_message["date_started"]))
+
     def test_list_warcs(self):
         harvester = BaseHarvester(self.working_path, host="localhost")
         write_fake_warc(self.working_path, "test_1-20151109195229879-00000-97528-GLSS-F0G5RP-8000.warc.gz")
