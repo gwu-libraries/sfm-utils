@@ -3,7 +3,7 @@ import os
 import tempfile
 import shutil
 import json
-from mock import MagicMock, patch, Mock
+from mock import MagicMock, patch, Mock, PropertyMock
 import iso8601
 from sfmutils.exporter import BaseTable, BaseExporter, CODE_WARC_MISSING, CODE_NO_WARCS, CODE_BAD_REQUEST
 from sfmutils.api_client import ApiClient
@@ -39,8 +39,8 @@ class TestExporter(tests.TestCase):
 
     @patch("sfmutils.exporter.ApiClient", autospec=True)
     # Mock out Producer
-    @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_export_collection(self, mock_producer_cls, mock_api_client_cls):
+    @patch("sfmutils.consumer.ConsumerProducerMixin.producer", new_callable=PropertyMock, spec=Producer)
+    def test_export_collection(self, mock_producer, mock_api_client_cls):
         mock_warc_iter_cls = MagicMock()
         mock_table_cls = MagicMock()
         mock_table = MagicMock(spec=BaseTable)
@@ -54,8 +54,6 @@ class TestExporter(tests.TestCase):
         mock_connection = MagicMock(spec=Connection)
         mock_exchange = MagicMock(spec=Exchange)
         mock_exchange.name = "test exchange"
-        mock_producer = MagicMock(spec=Producer)
-        mock_producer_cls.return_value = mock_producer
 
         item_date_start = "2007-01-25T12:00:00Z"
         item_datetime_start = iso8601.parse_date(item_date_start)
@@ -106,8 +104,7 @@ class TestExporter(tests.TestCase):
             lines = f.readlines()
         self.assertEqual(3, len(lines))
 
-        name, _, kwargs = mock_producer.mock_calls[0]
-        self.assertEqual("publish", name)
+        name, _, kwargs = mock_producer.mock_calls[1]
         self.assertEqual("export.status.test.test_user", kwargs["routing_key"])
         export_status_message = kwargs["body"]
         self.assertEqual("running", export_status_message["status"])
@@ -117,8 +114,7 @@ class TestExporter(tests.TestCase):
         self.assertEqual("testhost", export_status_message["host"])
         self.assertTrue(export_status_message["instance"])
 
-        name, _, kwargs = mock_producer.mock_calls[1]
-        self.assertEqual("publish", name)
+        name, _, kwargs = mock_producer.mock_calls[3]
         self.assertEqual("export.status.test.test_user", kwargs["routing_key"])
         export_status_message = kwargs["body"]
         self.assertEqual("completed success", export_status_message["status"])
@@ -131,8 +127,8 @@ class TestExporter(tests.TestCase):
 
     @patch("sfmutils.exporter.ApiClient", autospec=True)
     # Mock out Producer
-    @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_export_dehydrate(self, mock_producer_cls, mock_api_client_cls):
+    @patch("sfmutils.consumer.ConsumerProducerMixin.producer", new_callable=PropertyMock, spec=Producer)
+    def test_export_dehydrate(self, mock_producer, mock_api_client_cls):
         mock_warc_iter_cls = MagicMock()
         mock_table_cls = MagicMock()
         mock_table = MagicMock(spec=BaseTable)
@@ -147,8 +143,6 @@ class TestExporter(tests.TestCase):
         mock_connection = MagicMock(spec=Connection)
         mock_exchange = MagicMock(spec=Exchange)
         mock_exchange.name = "test exchange"
-        mock_producer = MagicMock(spec=Producer)
-        mock_producer_cls.return_value = mock_producer
 
         export_message = {
             "id": "test1",
@@ -186,8 +180,7 @@ class TestExporter(tests.TestCase):
         self.assertEqual(2, len(lines))
         self.assertEqual("k2v1\n", lines[0])
 
-        name, _, kwargs = mock_producer.mock_calls[1]
-        self.assertEqual("publish", name)
+        name, _, kwargs = mock_producer.mock_calls[3]
         self.assertEqual("export.status.test.test_user", kwargs["routing_key"])
         export_status_message = kwargs["body"]
         self.assertEqual("completed success", export_status_message["status"])
@@ -280,8 +273,8 @@ class TestExporter(tests.TestCase):
 
     @patch("sfmutils.exporter.ApiClient", autospec=True)
     # Mock out Producer
-    @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_export_collection_and_seeds(self, mock_producer_cls, mock_api_client_cls):
+    @patch("sfmutils.consumer.ConsumerProducerMixin.producer", new_callable=PropertyMock, spec=Producer)
+    def test_export_collection_and_seeds(self, mock_producer, mock_api_client_cls):
         mock_api_client = MagicMock(spec=ApiClient)
         mock_api_client_cls.side_effect = [mock_api_client]
         warcs = [{"warc_id": "9dc0b9c3a93a49eb8f713330b43f954c",
@@ -293,8 +286,6 @@ class TestExporter(tests.TestCase):
         mock_connection = MagicMock(spec=Connection)
         mock_exchange = MagicMock(spec=Exchange)
         mock_exchange.name = "test exchange"
-        mock_producer = MagicMock(spec=Producer)
-        mock_producer_cls.return_value = mock_producer
 
         export_message = {
             "id": "test2",
@@ -324,8 +315,7 @@ class TestExporter(tests.TestCase):
 
         self.assertFalse(exporter.result.success)
 
-        name, _, kwargs = mock_producer.mock_calls[1]
-        self.assertEqual("publish", name)
+        name, _, kwargs = mock_producer.mock_calls[3]
         self.assertEqual("export.status.test.test_user", kwargs["routing_key"])
         export_status_message = kwargs["body"]
         self.assertEqual("completed failure", export_status_message["status"])

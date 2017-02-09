@@ -1,6 +1,6 @@
 import logging
-from kombu import Connection, Queue, Exchange, Producer
-from kombu.mixins import ConsumerMixin
+from kombu import Connection, Queue, Exchange
+from kombu.mixins import ConsumerProducerMixin
 import json
 import os
 import codecs
@@ -8,50 +8,6 @@ import codecs
 log = logging.getLogger(__name__)
 
 EXCHANGE = "sfm_exchange"
-
-
-# Copied from https://github.com/celery/kombu/blob/master/kombu/mixins.py until in a kombu release.
-class ConsumerProducerMixin(ConsumerMixin):
-    """Version of ConsumerMixin having separate connection for also
-    publishing messages.
-    Example:
-    .. code-block:: python
-        class Worker(ConsumerProducerMixin):
-            def __init__(self, connection):
-                self.connection = connection
-            def get_consumers(self, Consumer, channel):
-                return [Consumer(queues=Queue('foo'),
-                                 on_message=self.handle_message,
-                                 accept='application/json',
-                                 prefetch_count=10)]
-            def handle_message(self, message):
-                self.producer.publish(
-                    {'message': 'hello to you'},
-                    exchange='',
-                    routing_key=message.properties['reply_to'],
-                    correlation_id=message.properties['correlation_id'],
-                    retry=True,
-                )
-    """
-    _producer_connection = None
-
-    def on_consume_end(self, connection, channel):
-        if self._producer_connection is not None:
-            self._producer_connection.close()
-            self._producer_connection = None
-
-    @property
-    def producer(self):
-        return Producer(self.producer_connection)
-
-    @property
-    def producer_connection(self):
-        if self._producer_connection is None:
-            conn = self.connection.clone()
-            conn.ensure_connection(self.on_connection_error,
-                                   self.connect_max_retries)
-            self._producer_connection = conn
-        return self._producer_connection
 
 
 class BaseConsumer(ConsumerProducerMixin):
@@ -117,19 +73,19 @@ class BaseConsumer(ConsumerProducerMixin):
 
         consumer = Consumer(queues=queues,
                             callbacks=[self._callback],
-                            auto_declare=False)
+                            auto_declare=False,
+                            no_ack=True)
         consumer.qos(prefetch_count=1, apply_global=True)
         return [consumer]
 
     def _callback(self, message, message_obj):
         """
         Callback for receiving harvest message.
+
+        The message will already be acknowledged.
         """
         self.routing_key = message_obj.delivery_info["routing_key"]
         self.message = message
-
-        # Acknowledge the message
-        message_obj.ack()
 
         # Persist the message
         if self.persist_messages:

@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from mock import MagicMock, patch
+from mock import MagicMock, patch, PropertyMock
 import json
 import tempfile
 import os
@@ -130,7 +130,6 @@ class TestBaseHarvester(TestCase):
                 os.path.exists(os.path.join(self.harvest_path, "2015/11/09/19", WARC_FILENAME_TEMPLATE.format(i))))
 
     def assert_warc_created_message(self, warc_number, name, _, kwargs):
-        self.assertEqual("publish", name)
         self.assertEqual("warc_created", kwargs["routing_key"])
         warc_created_message = kwargs["body"]
         self.assertEqual(warc_created_message["harvest"]["id"], "test:1")
@@ -146,7 +145,6 @@ class TestBaseHarvester(TestCase):
         self.assertIsNotNone(iso8601.parse_date(warc_created_message["warc"]["date_created"]))
 
     def assert_web_harvest(self, warc_number, name, _, kwargs):
-        self.assertEqual("publish", name)
         self.assertEqual("harvest.start.web", kwargs["routing_key"])
         web_harvest_message = kwargs["body"]
         # A 32 character UUID
@@ -160,7 +158,6 @@ class TestBaseHarvester(TestCase):
 
     def assert_first_running_harvest_status(self, name, _, kwargs, is_resume=False):
         # Running harvest result message
-        self.assertEqual("publish", name)
         self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")
@@ -191,7 +188,6 @@ class TestBaseHarvester(TestCase):
 
     def assert_second_running_harvest_status(self, name, _, kwargs, is_resume=False):
         # Running harvest result message
-        self.assertEqual("publish", name)
         self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")
@@ -236,7 +232,6 @@ class TestBaseHarvester(TestCase):
         }, harvest_result_message["stats"])
 
     def assert_running_harvest_status(self, warc_count, name, _, kwargs, is_resume=False):
-        self.assertEqual("publish", name)
         self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")
@@ -265,7 +260,6 @@ class TestBaseHarvester(TestCase):
         }, harvest_result_message["stats"])
 
     def assert_completed_harvest_status(self, warc_count, name, _, kwargs, is_resume=False):
-        self.assertEqual("publish", name)
         self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")
@@ -300,14 +294,12 @@ class TestBaseHarvester(TestCase):
     # Mock out warcprox.
     @patch("sfmutils.harvester.warced", autospec=True)
     # Mock out Producer
-    @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_consume(self, mock_producer_class, mock_warced_class):
+    @patch("sfmutils.consumer.ConsumerProducerMixin.producer", new_callable=PropertyMock, spec=Producer)
+    def test_consume(self, mock_producer, mock_warced_class):
         # Setup
         mock_connection = MagicMock(spec=Connection)
         mock_exchange = MagicMock(spec=Exchange)
         mock_exchange.name = "test exchange"
-        mock_producer = MagicMock(spec=Producer)
-        mock_producer_class.return_value = mock_producer
         mock_warced = MagicMock(spec=warced)
         mock_warced_class.side_effect = [mock_warced]
         mock_message = MagicMock(spec=Message)
@@ -334,21 +326,21 @@ class TestBaseHarvester(TestCase):
         self.assert_warcs_moved(1, 2)
 
         # Messages
-        self.assert_first_running_harvest_status(*mock_producer.mock_calls[0])
-        self.assert_web_harvest(1, *mock_producer.mock_calls[1])
-        self.assert_warc_created_message(1, *mock_producer.mock_calls[2])
+        self.assert_first_running_harvest_status(*mock_producer.mock_calls[1])
+        self.assert_web_harvest(1, *mock_producer.mock_calls[3])
+        self.assert_warc_created_message(1, *mock_producer.mock_calls[5])
 
         # The first one has errors, infos, warnings, token updates, uids
-        self.assert_second_running_harvest_status(*mock_producer.mock_calls[3])
+        self.assert_second_running_harvest_status(*mock_producer.mock_calls[7])
 
-        self.assert_completed_harvest_status(1, *mock_producer.mock_calls[4])
+        self.assert_completed_harvest_status(1, *mock_producer.mock_calls[9])
 
         # Check state store
         self.assert_state_store(1)
 
     @patch("sfmutils.harvester.warced", autospec=True)
-    @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_stream_consume(self, mock_producer_class, mock_warced_class):
+    @patch("sfmutils.consumer.ConsumerProducerMixin.producer", new_callable=PropertyMock, spec=Producer)
+    def test_stream_consume(self, mock_producer, mock_warced_class):
         mock_connection = MagicMock(spec=Connection)
         mock_exchange = MagicMock(spec=Exchange)
         mock_exchange.name = "test exchange"
@@ -356,8 +348,6 @@ class TestBaseHarvester(TestCase):
         mock_warced_class.return_value = mock_warced
         mock_message = MagicMock(spec=Message)
         mock_message.delivery_info = {"routing_key": "harvest.start.test.test_usertimeline"}
-        mock_producer = MagicMock(spec=Producer)
-        mock_producer_class.return_value = mock_producer
 
         # Create harvester and invoke _callback
         harvester = TestableHarvester(self.working_path, mock_connection, mock_exchange, shutdown_on_count=5)
@@ -375,35 +365,35 @@ class TestBaseHarvester(TestCase):
         self.assert_warcs_moved(1, 6)
 
         # Messages
-        self.assert_first_running_harvest_status(*mock_producer.mock_calls[0])
-        self.assert_web_harvest(1, *mock_producer.mock_calls[1])
-        self.assert_warc_created_message(1, *mock_producer.mock_calls[2])
+        self.assert_first_running_harvest_status(*mock_producer.mock_calls[1])
+        self.assert_web_harvest(1, *mock_producer.mock_calls[3])
+        self.assert_warc_created_message(1, *mock_producer.mock_calls[5])
         # The first one has errors, infos, warnings, token updates, uids
-        self.assert_second_running_harvest_status(*mock_producer.mock_calls[3])
+        self.assert_second_running_harvest_status(*mock_producer.mock_calls[7])
 
-        self.assert_web_harvest(2, *mock_producer.mock_calls[4])
-        self.assert_warc_created_message(2, *mock_producer.mock_calls[5])
-        self.assert_running_harvest_status(2, *mock_producer.mock_calls[6])
+        self.assert_web_harvest(2, *mock_producer.mock_calls[9])
+        self.assert_warc_created_message(2, *mock_producer.mock_calls[11])
+        self.assert_running_harvest_status(2, *mock_producer.mock_calls[13])
 
-        self.assert_web_harvest(3, *mock_producer.mock_calls[7])
-        self.assert_warc_created_message(3, *mock_producer.mock_calls[8])
-        self.assert_running_harvest_status(3, *mock_producer.mock_calls[9])
+        self.assert_web_harvest(3, *mock_producer.mock_calls[15])
+        self.assert_warc_created_message(3, *mock_producer.mock_calls[17])
+        self.assert_running_harvest_status(3, *mock_producer.mock_calls[19])
 
-        self.assert_web_harvest(4, *mock_producer.mock_calls[10])
-        self.assert_warc_created_message(4, *mock_producer.mock_calls[11])
-        self.assert_running_harvest_status(4, *mock_producer.mock_calls[12])
+        self.assert_web_harvest(4, *mock_producer.mock_calls[21])
+        self.assert_warc_created_message(4, *mock_producer.mock_calls[23])
+        self.assert_running_harvest_status(4, *mock_producer.mock_calls[25])
 
-        self.assert_web_harvest(5, *mock_producer.mock_calls[13])
-        self.assert_warc_created_message(5, *mock_producer.mock_calls[14])
-        self.assert_running_harvest_status(5, *mock_producer.mock_calls[15])
-        self.assert_completed_harvest_status(5, *mock_producer.mock_calls[16])
+        self.assert_web_harvest(5, *mock_producer.mock_calls[27])
+        self.assert_warc_created_message(5, *mock_producer.mock_calls[29])
+        self.assert_running_harvest_status(5, *mock_producer.mock_calls[31])
+        self.assert_completed_harvest_status(5, *mock_producer.mock_calls[33])
 
         # Check state store
         self.assert_state_store(5)
 
     @patch("sfmutils.harvester.warced", autospec=True)
-    @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_stream_harvest_from_file_and_resume(self, mock_producer_class, mock_warced_class):
+    @patch("sfmutils.consumer.ConsumerProducerMixin.producer", new_callable=PropertyMock, spec=Producer)
+    def test_stream_harvest_from_file_and_resume(self, mock_producer, mock_warced_class):
         # This is really the same as stream_consume, just invoked from file.
         # Also testing resuming a harvest.
 
@@ -414,8 +404,6 @@ class TestBaseHarvester(TestCase):
         mock_warced_class.return_value = mock_warced
         mock_message = MagicMock(spec=Message)
         mock_message.delivery_info = {"routing_key": "harvest.start.test.test_usertimeline"}
-        mock_producer = MagicMock(spec=Producer)
-        mock_producer_class.return_value = mock_producer
 
         # Write message to file
         message_filepath = write_message_file(self.message)
@@ -457,38 +445,38 @@ class TestBaseHarvester(TestCase):
         self.assert_warcs_moved(0, 6)
 
         # Messages
-        self.assert_first_running_harvest_status(*mock_producer.mock_calls[0], is_resume=True)
-        self.assert_web_harvest(1, *mock_producer.mock_calls[1])
-        self.assert_warc_created_message(0, *mock_producer.mock_calls[2])
+        self.assert_first_running_harvest_status(*mock_producer.mock_calls[1], is_resume=True)
+        self.assert_web_harvest(1, *mock_producer.mock_calls[3])
+        self.assert_warc_created_message(0, *mock_producer.mock_calls[5])
         # The first one has errors, infos, warnings, token updates, uids
-        self.assert_second_running_harvest_status(*mock_producer.mock_calls[3], is_resume=True)
+        self.assert_second_running_harvest_status(*mock_producer.mock_calls[7], is_resume=True)
 
-        self.assert_web_harvest(2, *mock_producer.mock_calls[4])
-        self.assert_warc_created_message(1, *mock_producer.mock_calls[5])
-        self.assert_running_harvest_status(2, *mock_producer.mock_calls[6], is_resume=True)
+        self.assert_web_harvest(2, *mock_producer.mock_calls[9])
+        self.assert_warc_created_message(1, *mock_producer.mock_calls[11])
+        self.assert_running_harvest_status(2, *mock_producer.mock_calls[13], is_resume=True)
 
-        self.assert_web_harvest(3, *mock_producer.mock_calls[7])
-        self.assert_warc_created_message(2, *mock_producer.mock_calls[8])
-        self.assert_running_harvest_status(3, *mock_producer.mock_calls[9], is_resume=True)
+        self.assert_web_harvest(3, *mock_producer.mock_calls[15])
+        self.assert_warc_created_message(2, *mock_producer.mock_calls[17])
+        self.assert_running_harvest_status(3, *mock_producer.mock_calls[19], is_resume=True)
 
-        self.assert_web_harvest(4, *mock_producer.mock_calls[10])
-        self.assert_warc_created_message(3, *mock_producer.mock_calls[11])
-        self.assert_running_harvest_status(4, *mock_producer.mock_calls[12], is_resume=True)
+        self.assert_web_harvest(4, *mock_producer.mock_calls[21])
+        self.assert_warc_created_message(3, *mock_producer.mock_calls[23])
+        self.assert_running_harvest_status(4, *mock_producer.mock_calls[25], is_resume=True)
 
-        self.assert_web_harvest(5, *mock_producer.mock_calls[13])
-        self.assert_warc_created_message(4, *mock_producer.mock_calls[14])
-        self.assert_running_harvest_status(5, *mock_producer.mock_calls[15], is_resume=True)
+        self.assert_web_harvest(5, *mock_producer.mock_calls[27])
+        self.assert_warc_created_message(4, *mock_producer.mock_calls[29])
+        self.assert_running_harvest_status(5, *mock_producer.mock_calls[31], is_resume=True)
 
-        self.assert_web_harvest(6, *mock_producer.mock_calls[16])
-        self.assert_warc_created_message(5, *mock_producer.mock_calls[17])
-        self.assert_running_harvest_status(6, *mock_producer.mock_calls[18], is_resume=True)
-        self.assert_completed_harvest_status(6, *mock_producer.mock_calls[19], is_resume=True)
+        self.assert_web_harvest(6, *mock_producer.mock_calls[33])
+        self.assert_warc_created_message(5, *mock_producer.mock_calls[35])
+        self.assert_running_harvest_status(6, *mock_producer.mock_calls[37], is_resume=True)
+        self.assert_completed_harvest_status(6, *mock_producer.mock_calls[39], is_resume=True)
 
         self.assertFalse(os.path.exists(result_filepath))
 
     @patch("sfmutils.harvester.warced", autospec=True)
-    @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_consume_with_exception(self, mock_producer_class, mock_warced_class):
+    @patch("sfmutils.consumer.ConsumerProducerMixin.producer", new_callable=PropertyMock, spec=Producer)
+    def test_consume_with_exception(self, mock_producer, mock_warced_class):
 
         mock_connection = MagicMock(spec=Connection)
         mock_exchange = MagicMock(spec=Exchange)
@@ -497,8 +485,6 @@ class TestBaseHarvester(TestCase):
         mock_warced_class.return_value = mock_warced
         mock_message = MagicMock(spec=Message)
         mock_message.delivery_info = {"routing_key": "harvest.start.test.test_usertimeline"}
-        mock_producer = MagicMock(spec=Producer)
-        mock_producer_class.return_value = mock_producer
 
         # Create harvester and invoke _callback
         harvester = TestableHarvester(self.working_path, mock_connection, mock_exchange,
@@ -510,10 +496,9 @@ class TestBaseHarvester(TestCase):
         self.assertEqual(0, harvester.process_warc_call_count)
 
         # Failed harvest result message
-        self.assertEqual(2, len(mock_producer.mock_calls))
-        self.assert_first_running_harvest_status(*mock_producer.mock_calls[0])
-        name, _, kwargs = mock_producer.mock_calls[1]
-        self.assertEqual("publish", name)
+        self.assertEqual(4, len(mock_producer.mock_calls))
+        self.assert_first_running_harvest_status(*mock_producer.mock_calls[1])
+        name, _, kwargs = mock_producer.mock_calls[3]
         self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")
@@ -528,14 +513,12 @@ class TestBaseHarvester(TestCase):
     # Mock out warcprox.
     @patch("sfmutils.harvester.warced", autospec=True)
     # Mock out Producer
-    @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_consume_with_transient_exception(self, mock_producer_class, mock_warced_class):
+    @patch("sfmutils.consumer.ConsumerProducerMixin.producer", new_callable=PropertyMock, spec=Producer)
+    def test_consume_with_transient_exception(self, mock_producer, mock_warced_class):
         # Setup
         mock_connection = MagicMock(spec=Connection)
         mock_exchange = MagicMock(spec=Exchange)
         mock_exchange.name = "test exchange"
-        mock_producer = MagicMock(spec=Producer)
-        mock_producer_class.return_value = mock_producer
         mock_warced = MagicMock(spec=warced)
         mock_warced_class.side_effect = [mock_warced, mock_warced]
         mock_message = MagicMock(spec=Message)
@@ -563,31 +546,25 @@ class TestBaseHarvester(TestCase):
         self.assert_warcs_moved(2, 3)
 
         # Messages
-        self.assert_first_running_harvest_status(*mock_producer.mock_calls[0])
-        self.assert_web_harvest(1, *mock_producer.mock_calls[1])
-        self.assert_warc_created_message(2, *mock_producer.mock_calls[2])
+        self.assert_first_running_harvest_status(*mock_producer.mock_calls[1])
+        self.assert_web_harvest(1, *mock_producer.mock_calls[3])
+        self.assert_warc_created_message(2, *mock_producer.mock_calls[5])
 
         # The first one has errors, infos, warnings, token updates, uids
-        self.assert_second_running_harvest_status(*mock_producer.mock_calls[3])
+        self.assert_second_running_harvest_status(*mock_producer.mock_calls[7])
 
-        self.assert_completed_harvest_status(1, *mock_producer.mock_calls[4])
+        self.assert_completed_harvest_status(1, *mock_producer.mock_calls[9])
 
         # Check state store
         self.assert_state_store(1)
 
     # Mock out Producer
-    @patch("sfmutils.consumer.Producer", autospec=True)
-    def test_on_persist_exception(self, mock_producer_class):
+    @patch("sfmutils.consumer.ConsumerProducerMixin.producer", new_callable=PropertyMock, spec=Producer)
+    def test_on_persist_exception(self, mock_producer):
         # Setup
         mock_connection = MagicMock(spec=Connection)
         mock_exchange = MagicMock(spec=Exchange)
         mock_exchange.name = "test exchange"
-        mock_producer = MagicMock(spec=Producer)
-        mock_producer_class.return_value = mock_producer
-        mock_warced = MagicMock(spec=warced)
-        # mock_warced_class.side_effect = [mock_warced]
-        # mock_message = MagicMock(spec=Message)
-        # mock_message.delivery_info = {"routing_key": "harvest.start.test.test_usertimeline"}
 
         # Create harvester and invoke _callback
         harvester = TestableHarvester(self.working_path, mock_connection, mock_exchange)
@@ -596,40 +573,8 @@ class TestBaseHarvester(TestCase):
         harvester.routing_key = "harvest.start.test.test_usertimeline"
         harvester.on_persist_exception(Exception("Problem persisting"))
 
-        # Should be a harvest status message.
-
-        # # Test assertions
-        # self.assertEqual(1, harvester.harvest_seed_call_count)
-        # self.assertEqual(1, harvester.process_warc_call_count)
-        #
-        # mock_warced_class.assert_called_once_with("test_1", harvester.warc_temp_dir, debug=False, interrupt=False,
-        #                                           rollover_time=120)
-        # self.assertTrue(mock_warced.__enter__.called)
-        # self.assertTrue(mock_warced.__exit__.called)
-        #
-        # # Warc path deleted
-        # self.assertFalse(os.path.exists(harvester.warc_temp_dir))
-        #
-        # # Warcs moved
-        # # This tests 2015/11/09/19/test_1-20151109195229879-00001-97528-GLSS-F0G5RP-8000.warc.gz
-        # self.assert_warcs_moved(1, 2)
-        #
-        # # Messages
-        # self.assert_first_running_harvest_status(*mock_producer.mock_calls[0])
-        # self.assert_web_harvest(1, *mock_producer.mock_calls[1])
-        # self.assert_warc_created_message(1, *mock_producer.mock_calls[2])
-        #
-        # # The first one has errors, infos, warnings, token updates, uids
-        # self.assert_second_running_harvest_status(*mock_producer.mock_calls[3])
-        #
-        # self.assert_completed_harvest_status(1, *mock_producer.mock_calls[4])
-        #
-        # # Check state store
-        # self.assert_state_store(1)
-
         # Running harvest result message
-        (name, _, kwargs) = mock_producer.mock_calls[0]
-        self.assertEqual("publish", name)
+        (name, _, kwargs) = mock_producer.mock_calls[1]
         self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")
