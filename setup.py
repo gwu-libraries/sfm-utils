@@ -12,7 +12,7 @@ setup(
     test_suite='tests',
     scripts=['sfmutils/stream_consumer.py', 'sfmutils/find_warcs.py'],
     install_requires=['requests==2.9.1',
-                      'kombu==3.0.33',
+                      'kombu==4.0.2',
                       'supervisor==3.2.0',
                       'urllib3==1.14',
                       'warc==0.2.1',
