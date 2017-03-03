@@ -32,7 +32,8 @@ class TestableLineOrientedWarcIter(BaseWarcIter):
 
 class TestWarcIter(TestCase):
 
-    def _warc_filepath(self, filename):
+    @staticmethod
+    def _warc_filepath(filename):
         return os.path.join(os.path.dirname(__file__), "warcs/{}".format(filename))
 
     def test_not_line_oriented(self):
