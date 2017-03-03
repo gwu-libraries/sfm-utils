@@ -1,11 +1,15 @@
 from __future__ import absolute_import
 from unittest import TestCase
-from sfmutils.warcprox import warced
+from sfmutils.warcprox import warced, SubProcess
+from subprocess import Popen
 import os
 import socket
 import requests
 import tempfile
 import shutil
+from time import sleep
+from mock import patch, MagicMock
+import sys
 
 
 class WarcedTest(TestCase):
@@ -52,3 +56,32 @@ class WarcedTest(TestCase):
             self.assertTrue(files[0].endswith(".warc.gz"))
         finally:
             shutil.rmtree(warc_dir)
+
+
+class SubprocessTest(TestCase):
+    def test_process_end(self):
+        subprocess = SubProcess("sleep 1")
+        self.assertIsNotNone(subprocess.proc)
+        sleep(2)
+        subprocess.cleanup()
+        self.assertIsNone(subprocess.proc)
+
+    def test_terminate(self):
+        subprocess = SubProcess("sleep 35")
+        self.assertIsNotNone(subprocess.proc)
+        subprocess.cleanup()
+        self.assertIsNone(subprocess.proc)
+
+    @patch("sfmutils.warcprox.Popen", autospec=True)
+    def test_kill(self, mock_popen_cls):
+        mock_popen = MagicMock(spec=Popen)
+        mock_popen_cls.side_effect = [mock_popen]
+
+        subprocess = SubProcess("foo", terminate_wait_secs=2)
+        mock_popen_cls.assert_called_once_with(["foo"], stdout=sys.stdout)
+
+        mock_popen.poll.return_value = None
+        subprocess.cleanup()
+
+        mock_popen.terminate.assert_called_once_with()
+        mock_popen.kill.assert_called_once_with()

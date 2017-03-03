@@ -1,4 +1,4 @@
-import subprocess
+from subprocess import Popen
 import atexit
 import logging
 import sys
@@ -19,14 +19,15 @@ class SubProcess(object):
 
     Borrowed from https://github.com/ikreymer/pywb-webrecorder/blob/master/pywb-webrecorder.py
     """
-    def __init__(self, cl):
+    def __init__(self, cl, terminate_wait_secs=30):
         """
         Launch subprocess
         """
         log.info("Executing %s", cl)
+        self.terminate_wait_secs = terminate_wait_secs
         args = cl.split(' ')
         self.name = args[0]
-        self.proc = subprocess.Popen(args, stdout=sys.stdout)
+        self.proc = Popen(args, stdout=sys.stdout)
         atexit.register(self.cleanup)
 
     def cleanup(self):
@@ -38,10 +39,18 @@ class SubProcess(object):
             if self.proc:
                 log.debug("Terminating %s", self.name)
                 self.proc.terminate()
-            log.debug("Waiting for %s to terminate", self.name)
-            self.proc.wait()
-            log.debug("%s terminated", self.name)
-            self.proc = None
+                log.debug("Waiting for %s to terminate", self.name)
+                wait_secs = 0
+                while self.proc.poll() is None and wait_secs < self.terminate_wait_secs:
+                    wait_secs += 1
+                    sleep(1)
+                if wait_secs == self.terminate_wait_secs:
+                    log.debug("Killing %s", self.name)
+                    self.proc.kill()
+                    log.debug("Killed %s", self.name)
+                else:
+                    log.debug("%s terminated", self.name)
+                self.proc = None
         except Exception:
             try:
                 log.debug("Killing %s", self.name)
