@@ -64,14 +64,21 @@ class Msg:
     """
     An informational, warning, or error message to be included in a result.
     """
-    def __init__(self, code, message):
+    def __init__(self, code, message, **kwargs):
+        """
+        :param code: code, which should be some sort of a constant
+        :param message: a textual description of the message
+        :param kwargs: additional fields and values to be included in the message
+        """
         assert code
         assert message
         self.code = code
         self.message = message
+        self.extras = kwargs
 
     def to_map(self):
-        return {
-            "code": self.code,
-            "message": self.message
-        }
+        m = self.extras
+        m['code'] = self.code
+        m['message'] = self.message
+        return m
+
