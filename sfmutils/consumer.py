@@ -73,17 +73,15 @@ class BaseConsumer(ConsumerProducerMixin):
 
         consumer = Consumer(queues=queues,
                             callbacks=[self._callback],
-                            auto_declare=False,
-                            no_ack=True)
+                            auto_declare=False)
         consumer.qos(prefetch_count=1, apply_global=True)
         return [consumer]
 
     def _callback(self, message, message_obj):
         """
         Callback for receiving harvest message.
-
-        The message will already be acknowledged.
         """
+        message_obj.ack()
         self.routing_key = message_obj.delivery_info["routing_key"]
         self.message = message
 
