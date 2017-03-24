@@ -181,9 +181,9 @@ class BaseHarvester(BaseConsumer):
         # This is a graceful shutdown. Harvesting seeds is stopped and processing
         # is finished. This may take some time.
         def shutdown(signal_number, stack_frame):
-            log.debug("Shutdown triggered")
+            log.info("Shutdown triggered")
             if self.is_pause:
-                log.debug("This will be a pause of the harvest.")
+                log.info("This will be a pause of the harvest.")
             self.stop_harvest_loop_event.set()
             # stop_event tells the harvester to stop harvest_seeds.
             # This will allow warcprox to exit.
@@ -413,6 +413,7 @@ class BaseHarvester(BaseConsumer):
             message["date_ended"] = self.result.ended.isoformat()
 
         # Routing key may be none
+        log.info("Sending status message for harvest %s: %s", self.message["id"], status)
         status_routing_key = self.routing_key.replace("start", "status")
         self._publish_message(status_routing_key, message)
 
