@@ -20,7 +20,8 @@ from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
 from sfmutils.state_store import JsonHarvestStateStore, DelayedSetStateStoreAdapter
 from sfmutils.warcprox import warced
 from sfmutils.utils import safe_string, datetime_from_stamp, datetime_now
-from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING, STATUS_PAUSED
+from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING, STATUS_PAUSED, \
+    STATUS_STOPPING
 
 log = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ CODE_TOKEN_UNAUTHORIZED = "token_unauthorized"
 # A resume occurred
 CODE_HARVEST_RESUMED = "harvest_resumed"
 # Error during persisting message
-CODE_MSG_PERSIST_ERROR ="msg_persist_error"
+CODE_MSG_PERSIST_ERROR = "msg_persist_error"
 
 
 class BaseHarvester(BaseConsumer):
@@ -116,6 +117,7 @@ class BaseHarvester(BaseConsumer):
 
     Subclasses should overrride harvest_seeds().
     """
+
     def __init__(self, working_path, mq_config=None, stream_restart_interval_secs=30 * 60, debug=False,
                  use_warcprox=True, queue_warc_files_interval_secs=5 * 60, warc_rollover_secs=30 * 60,
                  debug_warcprox=False, tries=3, host=None):
@@ -538,7 +540,7 @@ class BaseHarvester(BaseConsumer):
                 self._send_warc_created_message(dest_warc_filepath)
 
                 # Send status message
-                self._send_status_message(STATUS_RUNNING)
+                self._send_status_message(STATUS_STOPPING if self.stop_harvest_seeds_event.is_set() else STATUS_RUNNING)
 
                 # Since these were sent, clear them.
                 self.result.token_updates = {}

@@ -2,6 +2,7 @@ STATUS_SUCCESS = "completed success"
 STATUS_FAILURE = "completed failure"
 STATUS_RUNNING = "running"
 STATUS_PAUSED = "paused"
+STATUS_STOPPING = "stopping"
 
 
 class BaseResult:

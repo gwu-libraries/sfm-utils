@@ -12,8 +12,8 @@ import logging
 import codecs
 from tests import TestCase
 from datetime import date, timedelta
-from sfmutils.harvester import BaseHarvester, STATUS_RUNNING, STATUS_FAILURE, STATUS_SUCCESS, CODE_HARVEST_RESUMED, \
-    CODE_UNKNOWN_ERROR
+from sfmutils.harvester import BaseHarvester, STATUS_RUNNING, STATUS_FAILURE, STATUS_SUCCESS, STATUS_STOPPING, \
+    CODE_HARVEST_RESUMED, CODE_UNKNOWN_ERROR
 from sfmutils.state_store import JsonHarvestStateStore
 from sfmutils.harvester import Msg
 from sfmutils.warcprox import warced
@@ -231,11 +231,11 @@ class TestBaseHarvester(TestCase):
             }
         }, harvest_result_message["stats"])
 
-    def assert_running_harvest_status(self, warc_count, name, _, kwargs, is_resume=False):
+    def assert_running_harvest_status(self, warc_count, name, _, kwargs, is_resume=False, status=STATUS_RUNNING):
         self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")
-        self.assertEqual(harvest_result_message["status"], STATUS_RUNNING)
+        self.assertEqual(harvest_result_message["status"], status)
         if not is_resume:
             self.assertEqual(1, len(harvest_result_message["infos"]))
             self.assertEqual(1, len(harvest_result_message["warnings"]))
@@ -258,6 +258,9 @@ class TestBaseHarvester(TestCase):
                 "stuff": warc_count * 10,
             }
         }, harvest_result_message["stats"])
+
+    def assert_stopping_harvest_status(self, warc_count, name, _, kwargs, is_resume=False):
+        self.assert_running_harvest_status(warc_count, name, _, kwargs, is_resume=is_resume, status=STATUS_STOPPING)
 
     def assert_completed_harvest_status(self, warc_count, name, _, kwargs, is_resume=False):
         self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
@@ -385,7 +388,7 @@ class TestBaseHarvester(TestCase):
 
         self.assert_web_harvest(5, *mock_producer.mock_calls[27])
         self.assert_warc_created_message(5, *mock_producer.mock_calls[29])
-        self.assert_running_harvest_status(5, *mock_producer.mock_calls[31])
+        self.assert_stopping_harvest_status(5, *mock_producer.mock_calls[31])
         self.assert_completed_harvest_status(5, *mock_producer.mock_calls[33])
 
         # Check state store
@@ -469,7 +472,7 @@ class TestBaseHarvester(TestCase):
 
         self.assert_web_harvest(6, *mock_producer.mock_calls[33])
         self.assert_warc_created_message(5, *mock_producer.mock_calls[35])
-        self.assert_running_harvest_status(6, *mock_producer.mock_calls[37], is_resume=True)
+        self.assert_stopping_harvest_status(6, *mock_producer.mock_calls[37], is_resume=True)
         self.assert_completed_harvest_status(6, *mock_producer.mock_calls[39], is_resume=True)
 
         self.assertFalse(os.path.exists(result_filepath))
