@@ -29,7 +29,7 @@ class WarcedTest(TestCase):
 
     def test_pick_a_port(self):
         port = warced._pick_a_port()
-        self.assertTrue(port >= 8000)
+        self.assertTrue(port >= 7000)
         # Make sure port is available
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.assertNotEqual(0, sock.connect_ex(('', port)))
