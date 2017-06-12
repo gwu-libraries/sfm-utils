@@ -620,6 +620,8 @@ class BaseHarvester(BaseConsumer):
         service_parser.add_argument("working_path")
         service_parser.add_argument("--skip-resume", action="store_true")
         service_parser.add_argument("--tries", type=int, default="3", help="Number of times to try harvests if errors.")
+        service_parser.add_argument("--priority-queues", type=lambda v: v.lower() in ("yes", "true", "t", "1"),
+                                    nargs="?", default="False", const="True")
 
         seed_parser = subparsers.add_parser("seed", help="Harvest based on a seed file.")
         seed_parser.add_argument("filepath", help="Filepath of the seed file.")
@@ -637,6 +639,12 @@ class BaseHarvester(BaseConsumer):
         logging.getLogger("requests").setLevel(logging.debug if args.debug_http else logging.INFO)
         logging.getLogger("requests_oauthlib").setLevel(logging.debug if args.debug_http else logging.INFO)
         logging.getLogger("oauthlib").setLevel(logging.debug if args.debug_http else logging.INFO)
+
+        # Optionally add priority to queues
+        if args.priority_queues:
+            for i, key in enumerate(routing_keys):
+                routing_keys[i] = key + ".priority"
+            queue += "_priority"
 
         if args.command == "service":
             harvester = cls(args.working_path, mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE,
