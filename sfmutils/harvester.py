@@ -640,13 +640,13 @@ class BaseHarvester(BaseConsumer):
         logging.getLogger("requests_oauthlib").setLevel(logging.debug if args.debug_http else logging.INFO)
         logging.getLogger("oauthlib").setLevel(logging.debug if args.debug_http else logging.INFO)
 
-        # Optionally add priority to queues
-        if args.priority_queues:
-            for i, key in enumerate(routing_keys):
-                routing_keys[i] = key + ".priority"
-            queue += "_priority"
-
         if args.command == "service":
+            # Optionally add priority to queues
+            if args.priority_queues:
+                for i, key in enumerate(routing_keys):
+                    routing_keys[i] = key + ".priority"
+                queue += "_priority"
+
             harvester = cls(args.working_path, mq_config=MqConfig(args.host, args.username, args.password, EXCHANGE,
                                                                   {queue: routing_keys}),
                             debug=args.debug, debug_warcprox=args.debug_warcprox, tries=args.tries)
