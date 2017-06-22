@@ -126,8 +126,8 @@ class BaseHarvester(BaseConsumer):
         self.is_streaming = False
         self.routing_key = ""
         self.warc_temp_dir = None
-        self.stop_harvest_seeds_event = None
-        self.stop_harvest_loop_event = None
+        self.stop_harvest_seeds_event = threading.Event()
+        self.stop_harvest_loop_event = threading.Event()
         self.restart_stream_timer = None
         self.state_store = None
         self.debug = debug
