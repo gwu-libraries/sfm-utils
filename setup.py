@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='sfmutils',
-    version='1.10.0',
+    version='1.11.0',
     url='https://github.com/gwu-libraries/sfm-utils',
     author='Justin Littman',
     author_email='justinlittman@gmail.com',
