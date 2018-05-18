@@ -25,7 +25,7 @@ class ApiClient:
         return resp.json()
 
     def warcs(self, collection_id=None, seed_ids=None, harvest_date_start=None, harvest_date_end=None,
-              exclude_web=False):
+              created_date_start=None, created_date_end=None, exclude_web=False):
         """
         Iterator over WARC model objects.
 
@@ -33,6 +33,8 @@ class ApiClient:
         :param seed_ids: Limit WARCs to this list of seeds
         :param harvest_date_start: Limit to WARCs whose harvest started after this datetime
         :param harvest_date_end: Limit to WARCs whose harvest started before this datetime
+        :param created_date_start: Limit to WARCs created after this datetime
+        :param created_date_end: Limit to WARCs created before this datetime
         :param exclude_web: If True, WARCs containing web harvests.
         :return: WARC iterator
         """
@@ -41,6 +43,8 @@ class ApiClient:
         params["seed"] = seed_ids
         params["harvest_date_start"] = harvest_date_start
         params["harvest_date_end"] = harvest_date_end
+        params["created_date_start"] = created_date_start
+        params["created_date_end"] = created_date_end
         if exclude_web:
             params["exclude_web"] = True
         warcs = self._get("/api/v1/warcs/", params)

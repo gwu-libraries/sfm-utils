@@ -16,11 +16,16 @@ def main(sys_argv):
                                                 "2015-02-22T14:49:07Z")
     parser.add_argument("--harvest-end", help="ISO8601 datetime before which harvest was performed. For example, "
                                               "2015-02-22T14:49:07Z")
+    parser.add_argument("--warc-start", help="ISO8601 datetime after which WARC was created. For example, "
+                                                "2015-02-22T14:49:07Z")
+    parser.add_argument("--warc-end", help="ISO8601 datetime before which WARC was created. For example, "
+                                              "2015-02-22T14:49:07Z")
     default_api_base_url = "http://api:8080"
     parser.add_argument("--api-base-url", help="Base url of the SFM API. Default is {}.".format(default_api_base_url),
                         default=default_api_base_url)
     parser.add_argument("--debug", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
                         default="False", const="True")
+    parser.add_argument("--newline", action="store_true", help="Separates WARCs by newline instead of space.")
     parser.add_argument("collection", nargs="+", help="Limit to WARCs of this collection. "
                                                       "Truncated collection ids may be used.")
 
@@ -54,10 +59,12 @@ def main(sys_argv):
     for collection_id in collection_ids:
         log.debug("Looking up warcs for %s", collection_id)
         warcs = api_client.warcs(collection_id=collection_id, harvest_date_start=args.harvest_start,
-                                 harvest_date_end=args.harvest_end, exclude_web=not args.include_web)
+                                 harvest_date_end=args.harvest_end, exclude_web=not args.include_web,
+                                 created_date_start=args.warc_start, created_date_end=args.warc_end)
         for warc in warcs:
             warc_filepaths.add(warc["path"])
-    return " ".join(sorted(warc_filepaths))
+    sep = "\n" if args.newline else " "
+    return sep.join(sorted(warc_filepaths))
 
 if __name__ == "__main__":
     print main(sys.argv)
