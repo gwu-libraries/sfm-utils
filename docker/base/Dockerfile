@@ -1,4 +1,5 @@
-FROM python@sha256:ad39551743b356efda7c61f46019b97d49d1aab01b97f0e6d87c9b34326f3bfe
+# Python 2.7
+FROM python@sha256:8907ce99826e948f535e9e2524225a8c5b2d273f2b223c7fe7d82e1fb41efdc3
 MAINTAINER Justin Littman <justinlittman@gwu.edu>
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -20,7 +21,7 @@ RUN apt-get update && apt-get install -y \
     git=1:2.1.4-2.1+deb8u1 \
     zip=3.0-8
 
-RUN pip install pip==9.0.1
+RUN pip install pip==10.0.1
 #Avoid the warning of https
 RUN pip install --upgrade ndg-httpsclient
 RUN pip install appdeps
