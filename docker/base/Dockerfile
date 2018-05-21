@@ -18,8 +18,8 @@ RUN set -x \
 	&& gosu nobody true
 
 RUN apt-get update && apt-get install -y \
-    git=1:2.1.4-2.1+deb8u1 \
-    zip=3.0-8
+    git \
+    zip
 
 RUN pip install pip==10.0.1
 #Avoid the warning of https
