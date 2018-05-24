@@ -131,22 +131,6 @@ class BaseWarcIter:
             json.dump(item, fp, indent=4 if pretty else None)
             fp.write("\n")
 
-    def print_elk_warc_iter(self, pretty=False, fp=sys.stdout, limit_item_types=None,
-                            print_item_type=False,
-                            dedupe=False):
-        """
-        print the custom elk warc iterator for elk loader
-
-        """
-        pass
-
-    def print_elk_json_iter(self, pretty=False, fp=sys.stdout):
-        """
-        print the custom elk json iterator for elk loader
-
-        """
-        pass
-
     def _item_iter(self, url, json_obj):
         """
         Returns an iterator over the social media item types and items (as JSON objects).
@@ -217,10 +201,6 @@ class BaseWarcIter:
         parser.add_argument("--print-item-type", action="store_true", help="Print the item type.")
         parser.add_argument("--debug", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
                             default="False", const="True")
-        parser.add_argument("--elkwarc", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
-                            default="False", const="True")
-        parser.add_argument("--elkjson", type=lambda v: v.lower() in ("yes", "true", "t", "1"), nargs="?",
-                            default="False", const="True")
         parser.add_argument("filepaths", nargs="+", help="Filepath of the warc.")
 
         args = parser.parse_args()
@@ -230,11 +210,5 @@ class BaseWarcIter:
 
         main_limit_item_types = args.item_types.split(",") if "item_types" in vars(args) else None
 
-        if args.elkwarc:
-            cls(args.filepaths).print_elk_warc_iter(limit_item_types=main_limit_item_types, pretty=args.pretty,
-                                                    print_item_type=args.print_item_type, dedupe=args.dedupe)
-        elif args.elkjson:
-            cls(args.filepaths).print_elk_json_iter(pretty=args.pretty)
-        else:
-            cls(args.filepaths).print_iter(limit_item_types=main_limit_item_types, pretty=args.pretty,
-                                           print_item_type=args.print_item_type, dedupe=args.dedupe)
+        cls(args.filepaths).print_iter(limit_item_types=main_limit_item_types, pretty=args.pretty,
+                                       print_item_type=args.print_item_type, dedupe=args.dedupe)
