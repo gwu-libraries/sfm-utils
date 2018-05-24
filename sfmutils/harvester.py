@@ -184,6 +184,8 @@ class BaseHarvester(BaseConsumer):
         # is finished. This may take some time.
         def shutdown(signal_number, stack_frame):
             log.info("Shutdown triggered")
+            # This is for the consumer.
+            self.should_stop=True
             if self.is_pause:
                 log.info("This will be a pause of the harvest.")
             self.stop_harvest_loop_event.set()

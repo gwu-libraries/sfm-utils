@@ -16,7 +16,7 @@ setup(
                       'kombu==4.0.2',
                       'librabbitmq==1.6.1',
                       'supervisor==3.2.0',
-                      'urllib3==1.14',
+                      'urllib3==1.12',
                       'warc==0.2.1',
                       'iso8601==0.1.11',
                       'petl==1.1.0',

@@ -4,6 +4,7 @@ from kombu.mixins import ConsumerProducerMixin
 import json
 import os
 import codecs
+import signal
 
 log = logging.getLogger(__name__)
 
@@ -23,6 +24,12 @@ class BaseConsumer(ConsumerProducerMixin):
     To send a message, use self.producer.publish().
     """
     def __init__(self, mq_config=None, persist_messages=False, working_path=None):
+        # Handle SIGTERM
+        def stop(signum, frame):
+            log.info("Stopping for SIGTERM")
+            self.should_stop=True
+        signal.signal(signal.SIGTERM, stop)
+
         self.mq_config = mq_config
         if self.mq_config and self.mq_config.host and self.mq_config.username and self.mq_config.password:
             self.connection = Connection(transport="librabbitmq",

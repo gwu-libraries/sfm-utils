@@ -1,4 +1,5 @@
-FROM rabbitmq@sha256:60fa2366e203f1515b99082c4a2f3dcb157d836eacedb31dfdeb97d3fd9dd1ee
+# 3.7.5-management
+FROM rabbitmq@sha256:d374d705b3f16e3f0ee34ea14d8599cb4c1f1604ae6deef5fefbaf063d0bb9c6
 MAINTAINER Justin Littman <justinlittman@gwu.edu>
 
 ADD start.sh /usr/local/bin/mq_start.sh
