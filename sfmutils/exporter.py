@@ -74,7 +74,10 @@ class BaseExporter(BaseConsumer):
         if (collection_id or seed_ids) and not (collection_id and seed_ids):
             harvest_date_start = self.message.get("harvest_date_start")
             harvest_date_end = self.message.get("harvest_date_end")
-            warc_paths = self._get_warc_paths(collection_id, seed_ids, harvest_date_start, harvest_date_end)
+            # Only request seed ids if < 20. If use too many, will cause problems calling API.
+            # 20 is an arbitrary number
+            warc_paths = self._get_warc_paths(collection_id, seed_ids if len(seed_ids) <= 20 else None,
+                                              harvest_date_start, harvest_date_end)
             export_format = self.message["format"]
             export_segment_size = self.message["segment_size"]
             export_path = self.message["path"]
@@ -377,7 +380,7 @@ def to_lineoriented_json(table, source):
             f.write("\n")
 
 
-def to_xlsx(table,source):
+def to_xlsx(table, source):
     """
     Using xlsxwriter write table elements to xlsx since openpyxl has memory issue.
     """
