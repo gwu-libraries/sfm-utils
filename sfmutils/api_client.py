@@ -9,7 +9,8 @@ class ApiClient:
     def __init__(self, base_url):
         self.base_url = base_url
 
-    def _get(self, url_part, params):
+    @staticmethod
+    def _clean_params(params):
         clean_params = {}
         for k, v in params.items():
             if v is not None:
@@ -19,10 +20,21 @@ class ApiClient:
                         clean_params[k] = ",".join(v)
                 else:
                     clean_params[k] = v
+        return clean_params
+
+    def _get(self, url_part, params):
         url = urlparse.urljoin(self.base_url, url_part)
-        resp = requests.get(url, params=clean_params)
+        resp = requests.get(url, params=self._clean_params(params))
         resp.raise_for_status()
-        return resp.json()
+        while resp:
+            resp_json = resp.json()
+            for item in resp_json['results']:
+                yield item
+            if resp_json['next']:
+                resp = requests.get(resp_json['next'])
+                resp.raise_for_status()
+            else:
+                resp = None
 
     def warcs(self, collection_id=None, seed_ids=None, harvest_date_start=None, harvest_date_end=None,
               created_date_start=None, created_date_end=None, exclude_web=False):
@@ -47,9 +59,7 @@ class ApiClient:
         params["created_date_end"] = created_date_end
         if exclude_web:
             params["exclude_web"] = True
-        warcs = self._get("/api/v1/warcs/", params)
-        for warc in warcs:
-            yield warc
+        return self._get("/api/v1/warcs/", params)
 
     def collections(self, collection_id_startswith=None):
         """
@@ -61,6 +71,4 @@ class ApiClient:
         params = dict()
         if collection_id_startswith:
             params["collection_startswith"] = collection_id_startswith
-        collections = self._get("/api/v1/collections/", params)
-        for collection in collections:
-            yield collection
+        return self._get("/api/v1/collections/", params)

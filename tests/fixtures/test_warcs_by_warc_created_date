@@ -13,7 +13,7 @@ interactions:
     headers:
       allow: ['GET, HEAD, OPTIONS']
       content-type: [application/json]
-      date: ['Fri, 25 May 2018 14:06:29 GMT']
+      date: ['Fri, 25 May 2018 15:00:01 GMT']
       server: [WSGIServer/0.1 Python/2.7.15]
       vary: ['Accept, Cookie']
       x-frame-options: [SAMEORIGIN]
@@ -32,7 +32,7 @@ interactions:
     headers:
       allow: ['GET, HEAD, OPTIONS']
       content-type: [application/json]
-      date: ['Fri, 25 May 2018 14:06:29 GMT']
+      date: ['Fri, 25 May 2018 15:00:01 GMT']
       server: [WSGIServer/0.1 Python/2.7.15]
       vary: ['Accept, Cookie']
       x-frame-options: [SAMEORIGIN]
@@ -51,7 +51,7 @@ interactions:
     headers:
       allow: ['GET, HEAD, OPTIONS']
       content-type: [application/json]
-      date: ['Fri, 25 May 2018 14:06:29 GMT']
+      date: ['Fri, 25 May 2018 15:00:01 GMT']
       server: [WSGIServer/0.1 Python/2.7.15]
       vary: ['Accept, Cookie']
       x-frame-options: [SAMEORIGIN]

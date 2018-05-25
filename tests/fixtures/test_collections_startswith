@@ -7,15 +7,15 @@ interactions:
       Connection: [keep-alive]
       User-Agent: [python-requests/2.9.1]
     method: GET
-    uri: http://192.168.99.100:8081/api/v1/collections/?collection_startswith=8fcb71eb883745
+    uri: http://localhost:8080/api/v1/collections/?collection_startswith=366439dbb
   response:
-    body: {string: !!python/unicode '[{"collection_id":"8fcb71eb883745b6aa4ee94767253fc8","harvest_type":"twitter_sample","name":"Twitter
-        sample","is_active":false}]'}
+    body: {string: !!python/unicode '{"count":1,"next":null,"previous":null,"results":[{"collection_id":"366439dbb28146a9bd439dcc3f076c70","harvest_type":"twitter_user_timeline","name":"Test
+        user timeline","is_on":false}]}'}
     headers:
       allow: ['GET, HEAD, OPTIONS']
       content-type: [application/json]
-      date: ['Thu, 12 May 2016 21:03:37 GMT']
-      server: [WSGIServer/0.1 Python/2.7.6]
+      date: ['Fri, 25 May 2018 15:20:01 GMT']
+      server: [WSGIServer/0.1 Python/2.7.15]
       vary: ['Accept, Cookie']
       x-frame-options: [SAMEORIGIN]
     status: {code: 200, message: OK}
@@ -27,14 +27,14 @@ interactions:
       Connection: [keep-alive]
       User-Agent: [python-requests/2.9.1]
     method: GET
-    uri: http://192.168.99.100:8081/api/v1/collections/?collection_startswith=x8fcb71eb883745
+    uri: http://localhost:8080/api/v1/collections/?collection_startswith=x366439dbb
   response:
-    body: {string: !!python/unicode '[]'}
+    body: {string: !!python/unicode '{"count":0,"next":null,"previous":null,"results":[]}'}
     headers:
       allow: ['GET, HEAD, OPTIONS']
       content-type: [application/json]
-      date: ['Thu, 12 May 2016 21:03:37 GMT']
-      server: [WSGIServer/0.1 Python/2.7.6]
+      date: ['Fri, 25 May 2018 15:20:01 GMT']
+      server: [WSGIServer/0.1 Python/2.7.15]
       vary: ['Accept, Cookie']
       x-frame-options: [SAMEORIGIN]
     status: {code: 200, message: OK}

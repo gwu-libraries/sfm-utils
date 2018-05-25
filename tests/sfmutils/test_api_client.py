@@ -6,11 +6,12 @@ vcr = base_vcr.VCR(
         cassette_library_dir='tests/fixtures',
         record_mode='once',
     )
+# Make sure to set page size to 2 when recording test fixtures.
 
 
 class TestApiClient(TestCase):
     def setUp(self):
-        self.client = ApiClient("http://192.168.99.100:8081/")
+        self.client = ApiClient("http://localhost:8080/")
 
     @vcr.use_cassette()
     def test_all_warcs(self):
@@ -18,40 +19,35 @@ class TestApiClient(TestCase):
 
     @vcr.use_cassette()
     def test_warcs_by_collection(self):
-        self.assertEqual(2, len(list(self.client.warcs(collection_id="005b131f5f854402afa2b08a4b7ba960"))))
-        self.assertEqual(0, len(list(self.client.warcs(collection_id="x005b131f5f854402afa2b08a4b7ba960"))))
+        self.assertEqual(2, len(list(self.client.warcs(collection_id="366439dbb28146a9bd439dcc3f076c70"))))
+        self.assertEqual(0, len(list(self.client.warcs(collection_id="x366439dbb28146a9bd439dcc3f076c70"))))
 
     @vcr.use_cassette()
     def test_warcs_by_seed(self):
-        self.assertEqual(2, len(list(self.client.warcs(seed_ids="ded3849618b04818ae100a489d67d395"))))
-        self.assertEqual(0, len(list(self.client.warcs(seed_ids="xded3849618b04818ae100a489d67d395"))))
-        self.assertEqual(2, len(list(self.client.warcs(seed_ids=["ded3849618b04818ae100a489d67d395"]))))
-        self.assertEqual(2, len(list(self.client.warcs(seed_ids=["ded3849618b04818ae100a489d67d395", "x"]))))
+        self.assertEqual(2, len(list(self.client.warcs(seed_ids="4117a0b5c42646589f5dc81b0fa5eb0c"))))
+        self.assertEqual(0, len(list(self.client.warcs(seed_ids="x4117a0b5c42646589f5dc81b0fa5eb0c"))))
+        self.assertEqual(2, len(list(self.client.warcs(seed_ids=["4117a0b5c42646589f5dc81b0fa5eb0c"]))))
+        self.assertEqual(2, len(list(self.client.warcs(seed_ids=["4117a0b5c42646589f5dc81b0fa5eb0c", "x"]))))
         self.assertEqual(3, len(
-            list(self.client.warcs(seed_ids=["48722ac6154241f592fd74da775b7ab7", "3ce76759a3ee40b894562a35359dfa54"]))))
+            list(self.client.warcs(seed_ids=["4117a0b5c42646589f5dc81b0fa5eb0c", "c07e9e180dd24abcac700d1934bda3d1"]))))
 
     @vcr.use_cassette()
     def test_warcs_by_harvest_date_start(self):
-        self.assertEqual(3, len(list(self.client.warcs(harvest_date_start="2015-02-22T14:49:07Z"))))
-        self.assertEqual(1, len(list(self.client.warcs(harvest_date_start="2016-02-22T14:49:07Z"))))
-        self.assertEqual(0, len(list(self.client.warcs(harvest_date_start="2017-02-22T14:48:07Z"))))
+        self.assertEqual(3, len(list(self.client.warcs(harvest_date_start="2017-05-25T13:57:47.980000Z"))))
+        self.assertEqual(1, len(list(self.client.warcs(harvest_date_start="2018-05-25T13:56:47.980000Z"))))
+        self.assertEqual(0, len(list(self.client.warcs(harvest_date_start="2019-05-25T13:57:47.980000Z"))))
 
     @vcr.use_cassette()
-    def test_warcs_by_harvest_date_end(self):
-        self.assertEqual(0, len(list(self.client.warcs(harvest_date_end="2015-02-22T14:49:07Z"))))
-        self.assertEqual(2, len(list(self.client.warcs(harvest_date_end="2016-02-22T14:49:07Z"))))
-        self.assertEqual(3, len(list(self.client.warcs(harvest_date_end="2017-02-22T14:48:07Z"))))
-
-    @vcr.use_cassette()
-    def test_exclude_web(self):
-        self.assertEqual(4, len(list(self.client.warcs(exclude_web=True))))
-        self.assertEqual(5, len(list(self.client.warcs(exclude_web=False))))
+    def test_warcs_by_warc_created_date(self):
+        self.assertEqual(3, len(list(self.client.warcs(harvest_date_start="2017-05-25T13:57:47.980000Z"))))
+        self.assertEqual(1, len(list(self.client.warcs(harvest_date_start="2018-05-25T13:56:47.980000Z"))))
+        self.assertEqual(0, len(list(self.client.warcs(harvest_date_start="2019-05-25T13:57:47.980000Z"))))
 
     @vcr.use_cassette()
     def test_all_collections(self):
-        self.assertEqual(5, len(list(self.client.collections())))
+        self.assertEqual(2, len(list(self.client.collections())))
 
     @vcr.use_cassette()
     def test_collections_startswith(self):
-        self.assertEqual(1, len(list(self.client.collections(collection_id_startswith="8fcb71eb883745"))))
-        self.assertEqual(0, len(list(self.client.collections(collection_id_startswith="x8fcb71eb883745"))))
+        self.assertEqual(1, len(list(self.client.collections(collection_id_startswith="366439dbb"))))
+        self.assertEqual(0, len(list(self.client.collections(collection_id_startswith="x366439dbb"))))

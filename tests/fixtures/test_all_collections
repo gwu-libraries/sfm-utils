@@ -7,19 +7,16 @@ interactions:
       Connection: [keep-alive]
       User-Agent: [python-requests/2.9.1]
     method: GET
-    uri: http://192.168.99.100:8081/api/v1/collections/
+    uri: http://localhost:8080/api/v1/collections/
   response:
-    body: {string: !!python/unicode '[{"collection_id":"4f4d1a6677f34d539bbd8486e22de33b","harvest_type":"twitter_user_timeline","name":"Twitter
-        timelines","is_active":false},{"collection_id":"77e6c01490e04d0fb1f854a310566eef","harvest_type":"twitter_search","name":"Test
-        twitter search","is_active":false},{"collection_id":"b7b58de0dd854c538e2472edc9b5b9df","harvest_type":"twitter_sample","name":"Twitter
-        sample","is_active":false},{"collection_id":"1eb5dd64122a4850ae212ea32cba36ea","harvest_type":"twitter_user_timeline","name":"Test
-        twitter users","is_active":true},{"collection_id":"abef9bf89102447fa2b7455b237d7e9a","harvest_type":"twitter_search","name":"Twitter
-        search","is_active":false}]'}
+    body: {string: !!python/unicode '{"count":2,"next":null,"previous":null,"results":[{"collection_id":"366439dbb28146a9bd439dcc3f076c70","harvest_type":"twitter_user_timeline","name":"Test
+        user timeline","is_on":false},{"collection_id":"37ae4087af6e4504a1a0e70e5bcd9ad6","harvest_type":"twitter_user_timeline","name":"Test
+        user timeline2","is_on":false}]}'}
     headers:
       allow: ['GET, HEAD, OPTIONS']
       content-type: [application/json]
-      date: ['Thu, 05 May 2016 23:47:13 GMT']
-      server: [WSGIServer/0.1 Python/2.7.6]
+      date: ['Fri, 25 May 2018 14:07:02 GMT']
+      server: [WSGIServer/0.1 Python/2.7.15]
       vary: ['Accept, Cookie']
       x-frame-options: [SAMEORIGIN]
     status: {code: 200, message: OK}
