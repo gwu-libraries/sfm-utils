@@ -102,6 +102,12 @@ CODE_TOKEN_NOT_FOUND = "token_not_found"
 CODE_UID_NOT_FOUND = "uid_not_found"
 # Token is unauthorized/private.
 CODE_TOKEN_UNAUTHORIZED = "token_unauthorized"
+# UID is unauthorized/private.
+CODE_UID_UNAUTHORIZED = "uid_unauthorized"
+# Token is suspended.
+CODE_TOKEN_SUSPENDED = "token_suspended"
+# UID is suspended.
+CODE_UID_SUSPENDED = "uid_suspended"
 # A resume occurred
 CODE_HARVEST_RESUMED = "harvest_resumed"
 # Error during persisting message
