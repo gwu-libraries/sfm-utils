@@ -33,7 +33,6 @@ class HarvestResult(BaseResult):
 
     def __init__(self):
         BaseResult.__init__(self)
-        self.urls = []
         self.warcs = []
         self.warc_bytes = 0
         # Map of days to counters (map of items to counts)
@@ -54,8 +53,6 @@ class HarvestResult(BaseResult):
             harv_str += " Warcs: {}".format(self.warcs)
         if self.warc_bytes:
             harv_str += " Warc bytes: {}".format(self.warc_bytes)
-        if self.urls:
-            harv_str += " Urls: {}".format(self.urls)
         if self._stats:
             harv_str += " Harvest stats: {}".format(self.stats_summary())
         if self.token_updates:
@@ -63,9 +60,6 @@ class HarvestResult(BaseResult):
         if self.uids:
             harv_str += " Uids: {}".format(self.uids)
         return harv_str
-
-    def urls_as_set(self):
-        return set(self.urls)
 
     def increment_stats(self, item, count=1, day=None):
         if day is None:
@@ -191,7 +185,7 @@ class BaseHarvester(BaseConsumer):
         def shutdown(signal_number, stack_frame):
             log.info("Shutdown triggered")
             # This is for the consumer.
-            self.should_stop=True
+            self.should_stop = True
             if self.is_pause:
                 log.info("This will be a pause of the harvest.")
             self.stop_harvest_loop_event.set()
@@ -362,7 +356,7 @@ class BaseHarvester(BaseConsumer):
                      (f.endswith(".warc") or f.endswith(".warc.gz"))]
             log.debug("Found following WARCs in %s: %s", path, warcs)
         else:
-            log.warn("Warc path %s does not exist. This may be OK.", path)
+            log.warning("Warc path %s does not exist. This may be OK.", path)
         return warcs
 
     @staticmethod
@@ -370,30 +364,6 @@ class BaseHarvester(BaseConsumer):
         m = re.search("-(\d{4})(\d{2})(\d{2})(\d{2})\d{7}-", filename)
         assert m
         return "/".join([harvest_path, m.group(1), m.group(2), m.group(3), m.group(4)])
-
-    def _send_web_harvest_message(self):
-        urls_set = self.result.urls_as_set()
-        if urls_set:
-            message = {
-                "id": uuid.uuid4().hex,
-                "parent_id": self.message["id"],
-                "path": self.message["path"],
-                "type": "web",
-                "seeds": [],
-                "collection_set": {
-                    "id": self.message["collection_set"]["id"]
-                },
-                "collection": {
-                    "id": self.message["collection"]["id"]
-                }
-            }
-            for url in urls_set:
-                if url:
-                    message["seeds"].append({"token": url})
-
-            self._publish_message("harvest.start.web", message, trunate_debug_length=5000)
-        else:
-            log.debug("No urls, so not sending a web harvest message.")
 
     def _send_status_message(self, status):
         message = {
@@ -524,12 +494,6 @@ class BaseHarvester(BaseConsumer):
                 # Process the warc
                 self.process_warc(warc_filepath)
 
-                # Send web harvest message
-                self._send_web_harvest_message()
-
-                # Since the urls were sent, clear them
-                self.result.urls = []
-
                 # Move the warc
                 dest_path = self._path_for_warc(self.message["path"], warc_filename)
                 dest_warc_filepath = os.path.join(dest_path, warc_filename)
@@ -586,7 +550,6 @@ class BaseHarvester(BaseConsumer):
         Processes the provided WARC file.
 
         Processing involves:
-        * Extracting URLs and adding to self.result.
         * Save state to self.state_store.
         * Increment counts in self.result.
         """

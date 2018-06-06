@@ -15,7 +15,7 @@ import shutil
 import tempfile
 import re
 from sfmutils.result import BaseResult, Msg, STATUS_SUCCESS, STATUS_FAILURE, STATUS_RUNNING
-from sfmutils.utils import datetime_from_stamp, datetime_now
+from sfmutils.utils import datetime_now
 from itertools import islice
 import xlsxwriter
 
@@ -177,7 +177,8 @@ class BaseExporter(BaseConsumer):
                     json.dump(status.item, f)
                     f.write("\n")
 
-    def _chunk_json(self, warcs, chunk_size):
+    @staticmethod
+    def _chunk_json(warcs, chunk_size):
         iterable = iter(warcs)
         split_size = chunk_size - 1 if chunk_size else None
         for post in iterable:
@@ -198,8 +199,7 @@ class BaseExporter(BaseConsumer):
         warc_paths = []
         log.debug("Getting warcs for collection %s", collection_id)
         for warc in self.api_client.warcs(collection_id=collection_id, seed_ids=seed_ids,
-                                          harvest_date_start=harvest_date_start, harvest_date_end=harvest_date_end,
-                                          exclude_web=True):
+                                          harvest_date_start=harvest_date_start, harvest_date_end=harvest_date_end):
             warc_path = os.path.join(self.warc_base_path, warc["path"]) if self.warc_base_path else warc["path"]
             if os.path.exists(warc_path):
                 warc_paths.append(warc_path)
@@ -356,7 +356,7 @@ class BaseTable(petl.Table):
 
                 yield chunk()
             except KeyError, e:
-                log.warn("Invalid key %s in %s", e.message, json.dumps(post.item, indent=4))
+                log.warning("Invalid key %s in %s", e.message, json.dumps(post.item, indent=4))
 
 
 class DateEncoder(JSONEncoder):

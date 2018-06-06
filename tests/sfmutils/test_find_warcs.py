@@ -19,9 +19,9 @@ class TestFindWarcs(tests.TestCase):
         self.assertEqual([call(collection_id_startswith='abc'), call(collection_id_startswith='def')],
                          mock_api_client.collections.call_args_list)
         self.assertEqual(
-            [call(exclude_web=True, harvest_date_end=None, harvest_date_start=None, created_date_start=None,
+            [call(harvest_date_end=None, harvest_date_start=None, created_date_start=None,
                   created_date_end=None, collection_id='abc123'),
-             call(exclude_web=True, harvest_date_end=None, harvest_date_start=None, created_date_start=None,
+             call(harvest_date_end=None, harvest_date_start=None, created_date_start=None,
                   created_date_end=None, collection_id='def456')],
             mock_api_client.warcs.call_args_list)
         mock_sys.exit.assert_not_called()
@@ -38,15 +38,15 @@ class TestFindWarcs(tests.TestCase):
         self.assertEqual("/sfm-data/abc123 /sfm-data/def456 /sfm-data/def789",
                          main("find_warcs.py --debug=True --harvest-start 2015-02-22T14:49:07Z --harvest-end "
                               "2016-02-22T14:49:07Z --warc-end 2014-02-22T14:49:07Z --warc-start "
-                              "2013-02-22T14:49:07Z --include-web abcdefghijklmnopqrstuvwxyz012345 def".split(
+                              "2013-02-22T14:49:07Z abcdefghijklmnopqrstuvwxyz012345 def".split(
                              " ")))
         self.assertEqual([call(collection_id_startswith='def')],
                          mock_api_client.collections.call_args_list)
         self.assertEqual(
-            [call(exclude_web=False, harvest_date_end='2016-02-22T14:49:07Z', harvest_date_start='2015-02-22T14:49:07Z',
+            [call(harvest_date_end='2016-02-22T14:49:07Z', harvest_date_start='2015-02-22T14:49:07Z',
                   collection_id='abcdefghijklmnopqrstuvwxyz012345', created_date_end="2014-02-22T14:49:07Z",
                   created_date_start="2013-02-22T14:49:07Z"),
-             call(exclude_web=False, harvest_date_end='2016-02-22T14:49:07Z', harvest_date_start='2015-02-22T14:49:07Z',
+             call(harvest_date_end='2016-02-22T14:49:07Z', harvest_date_start='2015-02-22T14:49:07Z',
                   collection_id='def456', created_date_end="2014-02-22T14:49:07Z",
                   created_date_start="2013-02-22T14:49:07Z")],
             mock_api_client.warcs.call_args_list)

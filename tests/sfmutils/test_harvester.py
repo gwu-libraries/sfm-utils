@@ -93,9 +93,6 @@ class TestableHarvester(BaseHarvester):
         self.process_warc_call_count += 1
         log.debug("Process warc call count is %s", self.process_warc_call_count)
 
-        for i in range(self.process_warc_call_count):
-            self.result.urls.append("http://www.{}-{}.edu".format(self.process_warc_call_count, i))
-
         if self.process_warc_call_count == 1:
             self.result.increment_stats("stuff", count=5, day=date.today() - timedelta(days=1))
         self.result.increment_stats("stuff", count=10)
@@ -143,18 +140,6 @@ class TestBaseHarvester(TestCase):
         self.assertEqual(warc_created_message["warc"]["bytes"], 9)
         self.assertEqual(32, len(warc_created_message["warc"]["id"]))
         self.assertIsNotNone(iso8601.parse_date(warc_created_message["warc"]["date_created"]))
-
-    def assert_web_harvest(self, warc_number, name, _, kwargs):
-        self.assertEqual("harvest.start.web", kwargs["routing_key"])
-        web_harvest_message = kwargs["body"]
-        # A 32 character UUID
-        self.assertEqual(32, len(web_harvest_message["id"]))
-        self.assertEqual("test:1", web_harvest_message["parent_id"])
-        self.assertEqual("web", web_harvest_message["type"])
-        self.assertEqual(warc_number, len(web_harvest_message["seeds"]))
-        self.assertEqual("test_collection_set", web_harvest_message["collection_set"]["id"])
-        self.assertEqual("test_collection", web_harvest_message["collection"]["id"])
-        self.assertEqual(self.harvest_path, web_harvest_message["path"])
 
     def assert_first_running_harvest_status(self, name, _, kwargs, is_resume=False):
         # Running harvest result message
@@ -330,13 +315,12 @@ class TestBaseHarvester(TestCase):
 
         # Messages
         self.assert_first_running_harvest_status(*mock_producer.mock_calls[1])
-        self.assert_web_harvest(1, *mock_producer.mock_calls[3])
-        self.assert_warc_created_message(1, *mock_producer.mock_calls[5])
+        self.assert_warc_created_message(1, *mock_producer.mock_calls[3])
 
         # The first one has errors, infos, warnings, token updates, uids
-        self.assert_second_running_harvest_status(*mock_producer.mock_calls[7])
+        self.assert_second_running_harvest_status(*mock_producer.mock_calls[5])
 
-        self.assert_completed_harvest_status(1, *mock_producer.mock_calls[9])
+        self.assert_completed_harvest_status(1, *mock_producer.mock_calls[7])
 
         # Check state store
         self.assert_state_store(1)
@@ -369,27 +353,22 @@ class TestBaseHarvester(TestCase):
 
         # Messages
         self.assert_first_running_harvest_status(*mock_producer.mock_calls[1])
-        self.assert_web_harvest(1, *mock_producer.mock_calls[3])
-        self.assert_warc_created_message(1, *mock_producer.mock_calls[5])
+        self.assert_warc_created_message(1, *mock_producer.mock_calls[3])
         # The first one has errors, infos, warnings, token updates, uids
-        self.assert_second_running_harvest_status(*mock_producer.mock_calls[7])
+        self.assert_second_running_harvest_status(*mock_producer.mock_calls[5])
 
-        self.assert_web_harvest(2, *mock_producer.mock_calls[9])
-        self.assert_warc_created_message(2, *mock_producer.mock_calls[11])
-        self.assert_running_harvest_status(2, *mock_producer.mock_calls[13])
+        self.assert_warc_created_message(2, *mock_producer.mock_calls[7])
+        self.assert_running_harvest_status(2, *mock_producer.mock_calls[9])
 
-        self.assert_web_harvest(3, *mock_producer.mock_calls[15])
-        self.assert_warc_created_message(3, *mock_producer.mock_calls[17])
-        self.assert_running_harvest_status(3, *mock_producer.mock_calls[19])
+        self.assert_warc_created_message(3, *mock_producer.mock_calls[11])
+        self.assert_running_harvest_status(3, *mock_producer.mock_calls[13])
 
-        self.assert_web_harvest(4, *mock_producer.mock_calls[21])
-        self.assert_warc_created_message(4, *mock_producer.mock_calls[23])
-        self.assert_running_harvest_status(4, *mock_producer.mock_calls[25])
+        self.assert_warc_created_message(4, *mock_producer.mock_calls[15])
+        self.assert_running_harvest_status(4, *mock_producer.mock_calls[17])
 
-        self.assert_web_harvest(5, *mock_producer.mock_calls[27])
-        self.assert_warc_created_message(5, *mock_producer.mock_calls[29])
-        self.assert_stopping_harvest_status(5, *mock_producer.mock_calls[31])
-        self.assert_completed_harvest_status(5, *mock_producer.mock_calls[33])
+        self.assert_warc_created_message(5, *mock_producer.mock_calls[19])
+        self.assert_stopping_harvest_status(5, *mock_producer.mock_calls[21])
+        self.assert_completed_harvest_status(5, *mock_producer.mock_calls[23])
 
         # Check state store
         self.assert_state_store(5)
@@ -449,31 +428,25 @@ class TestBaseHarvester(TestCase):
 
         # Messages
         self.assert_first_running_harvest_status(*mock_producer.mock_calls[1], is_resume=True)
-        self.assert_web_harvest(1, *mock_producer.mock_calls[3])
-        self.assert_warc_created_message(0, *mock_producer.mock_calls[5])
+        self.assert_warc_created_message(0, *mock_producer.mock_calls[3])
         # The first one has errors, infos, warnings, token updates, uids
-        self.assert_second_running_harvest_status(*mock_producer.mock_calls[7], is_resume=True)
+        self.assert_second_running_harvest_status(*mock_producer.mock_calls[5], is_resume=True)
 
-        self.assert_web_harvest(2, *mock_producer.mock_calls[9])
-        self.assert_warc_created_message(1, *mock_producer.mock_calls[11])
-        self.assert_running_harvest_status(2, *mock_producer.mock_calls[13], is_resume=True)
+        self.assert_warc_created_message(1, *mock_producer.mock_calls[7])
+        self.assert_running_harvest_status(2, *mock_producer.mock_calls[9], is_resume=True)
 
-        self.assert_web_harvest(3, *mock_producer.mock_calls[15])
-        self.assert_warc_created_message(2, *mock_producer.mock_calls[17])
-        self.assert_running_harvest_status(3, *mock_producer.mock_calls[19], is_resume=True)
+        self.assert_warc_created_message(2, *mock_producer.mock_calls[11])
+        self.assert_running_harvest_status(3, *mock_producer.mock_calls[13], is_resume=True)
 
-        self.assert_web_harvest(4, *mock_producer.mock_calls[21])
-        self.assert_warc_created_message(3, *mock_producer.mock_calls[23])
-        self.assert_running_harvest_status(4, *mock_producer.mock_calls[25], is_resume=True)
+        self.assert_warc_created_message(3, *mock_producer.mock_calls[15])
+        self.assert_running_harvest_status(4, *mock_producer.mock_calls[17], is_resume=True)
 
-        self.assert_web_harvest(5, *mock_producer.mock_calls[27])
-        self.assert_warc_created_message(4, *mock_producer.mock_calls[29])
-        self.assert_running_harvest_status(5, *mock_producer.mock_calls[31], is_resume=True)
+        self.assert_warc_created_message(4, *mock_producer.mock_calls[19])
+        self.assert_running_harvest_status(5, *mock_producer.mock_calls[21], is_resume=True)
 
-        self.assert_web_harvest(6, *mock_producer.mock_calls[33])
-        self.assert_warc_created_message(5, *mock_producer.mock_calls[35])
-        self.assert_stopping_harvest_status(6, *mock_producer.mock_calls[37], is_resume=True)
-        self.assert_completed_harvest_status(6, *mock_producer.mock_calls[39], is_resume=True)
+        self.assert_warc_created_message(5, *mock_producer.mock_calls[23])
+        self.assert_stopping_harvest_status(6, *mock_producer.mock_calls[25], is_resume=True)
+        self.assert_completed_harvest_status(6, *mock_producer.mock_calls[27], is_resume=True)
 
         self.assertFalse(os.path.exists(result_filepath))
 
@@ -550,13 +523,12 @@ class TestBaseHarvester(TestCase):
 
         # Messages
         self.assert_first_running_harvest_status(*mock_producer.mock_calls[1])
-        self.assert_web_harvest(1, *mock_producer.mock_calls[3])
-        self.assert_warc_created_message(2, *mock_producer.mock_calls[5])
+        self.assert_warc_created_message(2, *mock_producer.mock_calls[3])
 
         # The first one has errors, infos, warnings, token updates, uids
-        self.assert_second_running_harvest_status(*mock_producer.mock_calls[7])
+        self.assert_second_running_harvest_status(*mock_producer.mock_calls[5])
 
-        self.assert_completed_harvest_status(1, *mock_producer.mock_calls[9])
+        self.assert_completed_harvest_status(1, *mock_producer.mock_calls[7])
 
         # Check state store
         self.assert_state_store(1)

@@ -11,15 +11,14 @@ log = logging.getLogger(__name__)
 def main(sys_argv):
     # Arguments
     parser = argparse.ArgumentParser(description="Return WARC filepaths for passing to other commandlines.")
-    parser.add_argument("--include-web", action="store_true", help="Include WARCs for web harvests.")
     parser.add_argument("--harvest-start", help="ISO8601 datetime after which harvest was performed. For example, "
                                                 "2015-02-22T14:49:07Z")
     parser.add_argument("--harvest-end", help="ISO8601 datetime before which harvest was performed. For example, "
                                               "2015-02-22T14:49:07Z")
     parser.add_argument("--warc-start", help="ISO8601 datetime after which WARC was created. For example, "
-                                                "2015-02-22T14:49:07Z")
+                                             "2015-02-22T14:49:07Z")
     parser.add_argument("--warc-end", help="ISO8601 datetime before which WARC was created. For example, "
-                                              "2015-02-22T14:49:07Z")
+                                           "2015-02-22T14:49:07Z")
     default_api_base_url = "http://api:8080"
     parser.add_argument("--api-base-url", help="Base url of the SFM API. Default is {}.".format(default_api_base_url),
                         default=default_api_base_url)
@@ -48,23 +47,22 @@ def main(sys_argv):
             if len(collections) == 0:
                 print "No matching collections for {}".format(collection_id_part)
                 sys.exit(1)
-                return
             elif len(collections) > 1:
                 print "Multuple matching collections for {}".format(collection_id_part)
                 sys.exit(1)
-                return
             else:
                 collection_ids.append(collections[0]["collection_id"])
     warc_filepaths = set()
     for collection_id in collection_ids:
         log.debug("Looking up warcs for %s", collection_id)
         warcs = api_client.warcs(collection_id=collection_id, harvest_date_start=args.harvest_start,
-                                 harvest_date_end=args.harvest_end, exclude_web=not args.include_web,
+                                 harvest_date_end=args.harvest_end,
                                  created_date_start=args.warc_start, created_date_end=args.warc_end)
         for warc in warcs:
             warc_filepaths.add(warc["path"])
     sep = "\n" if args.newline else " "
     return sep.join(sorted(warc_filepaths))
+
 
 if __name__ == "__main__":
     print main(sys.argv)
