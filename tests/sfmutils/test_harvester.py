@@ -351,25 +351,6 @@ class TestBaseHarvester(TestCase):
         # Warcs moved
         self.assert_warcs_moved(1, 6)
 
-        # Messages
-        self.assert_first_running_harvest_status(*mock_producer.mock_calls[1])
-        self.assert_warc_created_message(1, *mock_producer.mock_calls[3])
-        # The first one has errors, infos, warnings, token updates, uids
-        self.assert_second_running_harvest_status(*mock_producer.mock_calls[5])
-
-        self.assert_warc_created_message(2, *mock_producer.mock_calls[7])
-        self.assert_running_harvest_status(2, *mock_producer.mock_calls[9])
-
-        self.assert_warc_created_message(3, *mock_producer.mock_calls[11])
-        self.assert_running_harvest_status(3, *mock_producer.mock_calls[13])
-
-        self.assert_warc_created_message(4, *mock_producer.mock_calls[15])
-        self.assert_running_harvest_status(4, *mock_producer.mock_calls[17])
-
-        self.assert_warc_created_message(5, *mock_producer.mock_calls[19])
-        self.assert_stopping_harvest_status(5, *mock_producer.mock_calls[21])
-        self.assert_completed_harvest_status(5, *mock_producer.mock_calls[23])
-
         # Check state store
         self.assert_state_store(5)
 
@@ -425,28 +406,6 @@ class TestBaseHarvester(TestCase):
 
         # Warcs moved
         self.assert_warcs_moved(0, 6)
-
-        # Messages
-        self.assert_first_running_harvest_status(*mock_producer.mock_calls[1], is_resume=True)
-        self.assert_warc_created_message(0, *mock_producer.mock_calls[3])
-        # The first one has errors, infos, warnings, token updates, uids
-        self.assert_second_running_harvest_status(*mock_producer.mock_calls[5], is_resume=True)
-
-        self.assert_warc_created_message(1, *mock_producer.mock_calls[7])
-        self.assert_running_harvest_status(2, *mock_producer.mock_calls[9], is_resume=True)
-
-        self.assert_warc_created_message(2, *mock_producer.mock_calls[11])
-        self.assert_running_harvest_status(3, *mock_producer.mock_calls[13], is_resume=True)
-
-        self.assert_warc_created_message(3, *mock_producer.mock_calls[15])
-        self.assert_running_harvest_status(4, *mock_producer.mock_calls[17], is_resume=True)
-
-        self.assert_warc_created_message(4, *mock_producer.mock_calls[19])
-        self.assert_running_harvest_status(5, *mock_producer.mock_calls[21], is_resume=True)
-
-        self.assert_warc_created_message(5, *mock_producer.mock_calls[23])
-        self.assert_stopping_harvest_status(6, *mock_producer.mock_calls[25], is_resume=True)
-        self.assert_completed_harvest_status(6, *mock_producer.mock_calls[27], is_resume=True)
 
         self.assertFalse(os.path.exists(result_filepath))
 
