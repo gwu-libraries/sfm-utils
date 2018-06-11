@@ -13,6 +13,7 @@ from sfmutils.utils import datetime_now
 from kombu import Producer, Connection, Exchange
 
 
+
 class TestExporter(tests.TestCase):
     def setUp(self):
         self.warc_base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "warcs")
@@ -90,8 +91,7 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(exclude_web=True,
-                                                      collection_id="005b131f5f854402afa2b08a4b7ba960",
+        mock_api_client.warcs.assert_called_once_with(collection_id="005b131f5f854402afa2b08a4b7ba960",
                                                       seed_ids=[], harvest_date_start=harvest_date_start,
                                                       harvest_date_end=harvest_date_end)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, True, item_datetime_start,
@@ -167,8 +167,7 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(exclude_web=True,
-                                                      collection_id="005b131f5f854402afa2b08a4b7ba960",
+        mock_api_client.warcs.assert_called_once_with(collection_id="005b131f5f854402afa2b08a4b7ba960",
                                                       seed_ids=[], harvest_date_end=None, harvest_date_start=None)
         mock_table_cls.assert_called_once_with(self.warc_filepaths, False, None, None, [], None)
 
@@ -224,7 +223,7 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(exclude_web=True, collection_id=None,
+        mock_api_client.warcs.assert_called_once_with(collection_id=None,
                                                       seed_ids=["005b131f5f854402afa2b08a4b7ba960",
                                                                 "105b131f5f854402afa2b08a4b7ba960"],
                                                       harvest_date_start=None, harvest_date_end=None)
@@ -309,8 +308,7 @@ class TestExporter(tests.TestCase):
         exporter.on_message()
 
         mock_api_client_cls.assert_called_once_with("http://test")
-        mock_api_client.warcs.assert_called_once_with(exclude_web=True,
-                                                      collection_id="005b131f5f854402afa2b08a4b7ba960",
+        mock_api_client.warcs.assert_called_once_with(collection_id="005b131f5f854402afa2b08a4b7ba960",
                                                       seed_ids=[], harvest_date_end=None, harvest_date_start=None)
 
         self.assertFalse(exporter.result.success)
