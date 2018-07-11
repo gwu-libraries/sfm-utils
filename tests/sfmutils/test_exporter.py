@@ -13,7 +13,6 @@ from sfmutils.utils import datetime_now
 from kombu import Producer, Connection, Exchange
 
 
-
 class TestExporter(tests.TestCase):
     def setUp(self):
         self.warc_base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "warcs")
@@ -378,7 +377,7 @@ class TestExporter(tests.TestCase):
                                                     limit_item_types=None)
 
         # file test_1.json, test_2.json , test_3.json
-        for idx in xrange(3):
+        for idx in range(3):
             file_path = export_filepath + '_' + str(idx + 1).zfill(3) + '.json'
             self.assertTrue(os.path.exists(file_path))
             with open(file_path, "r") as f:

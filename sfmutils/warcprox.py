@@ -20,6 +20,7 @@ class SubProcess(object):
 
     Borrowed from https://github.com/ikreymer/pywb-webrecorder/blob/master/pywb-webrecorder.py
     """
+
     def __init__(self, cl, terminate_wait_secs=30):
         """
         Launch subprocess
@@ -62,7 +63,7 @@ class SubProcess(object):
                 pass
 
 
-class warced():
+class warced:
     """
     An entry/exit wrapper for warcprox.
 
@@ -72,6 +73,7 @@ class warced():
     are set. This will properly configure the requests library to use the proxy;
     other configuration may be necessary for other HTTP libraries.
     """
+
     def __init__(self, prefix, directory, compress=True, port=None, debug=False, interrupt=False, rollover_time=None):
         """
         :param prefix: prefix for the WARC filename.
@@ -121,7 +123,7 @@ class warced():
 
     @staticmethod
     def _pick_a_port():
-        port = random.randint(7000,9000)
+        port = random.randint(7000, 9000)
         while True:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if s.connect_ex(('', port)):
@@ -129,11 +131,13 @@ class warced():
             port += 1
 
     def _generate_commandline(self):
-        cl = "warcprox -c {} --certs-dir {} --dedup-db-file /dev/null -d {} -n {} -p {}".format(self.ca_bundle,
-                                                                                                self.ca_dir,
-                                                                                                self.directory,
-                                                                                                self.prefix,
-                                                                                                self.port)
+        cl = "warcprox -c {} --certs-dir {} --dedup-db-file /dev/null --stats-db-file /dev/null --max-threads=1 " \
+             "-d {} -n {} -p {}".format(
+                self.ca_bundle,
+                self.ca_dir,
+                self.directory,
+                self.prefix,
+                self.port)
         if self.compress:
             cl += " -z"
         if self.debug:

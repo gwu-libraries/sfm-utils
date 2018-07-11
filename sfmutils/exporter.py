@@ -156,7 +156,7 @@ class BaseExporter(BaseConsumer):
         with tempfile.NamedTemporaryFile(dir=self.working_path, delete=False) as outfile:
             if prefix:
                 outfile.write(prefix)
-            shutil.copyfileobj(file(filepath, 'r'), outfile)
+            shutil.copyfileobj(open(filepath, 'r'), outfile)
             if suffix:
                 outfile.write(suffix)
         shutil.move(outfile.name, filepath)
@@ -355,8 +355,8 @@ class BaseTable(petl.Table):
                         yield self._row(more.item)
 
                 yield chunk()
-            except KeyError, e:
-                log.warning("Invalid key %s in %s", e.message, json.dumps(post.item, indent=4))
+            except KeyError:
+                log.warning("Invalid key in %s", json.dumps(post.item, indent=4))
 
 
 class DateEncoder(JSONEncoder):

@@ -126,7 +126,7 @@ class TestBaseHarvester(TestCase):
             self.assertTrue(
                 os.path.exists(os.path.join(self.harvest_path, "2015/11/09/19", WARC_FILENAME_TEMPLATE.format(i))))
 
-    def assert_warc_created_message(self, warc_number, name, _, kwargs):
+    def assert_warc_created_message(self, warc_number, _, __, kwargs):
         self.assertEqual("warc_created", kwargs["routing_key"])
         warc_created_message = kwargs["body"]
         self.assertEqual(warc_created_message["harvest"]["id"], "test:1")
@@ -141,7 +141,7 @@ class TestBaseHarvester(TestCase):
         self.assertEqual(32, len(warc_created_message["warc"]["id"]))
         self.assertIsNotNone(iso8601.parse_date(warc_created_message["warc"]["date_created"]))
 
-    def assert_first_running_harvest_status(self, name, _, kwargs, is_resume=False):
+    def assert_first_running_harvest_status(self, _, __, kwargs, is_resume=False):
         # Running harvest result message
         self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
         harvest_result_message = kwargs["body"]
@@ -171,7 +171,7 @@ class TestBaseHarvester(TestCase):
             self.assertEqual(0, harvest_result_message["warcs"]["bytes"])
             self.assertDictEqual({}, harvest_result_message["stats"])
 
-    def assert_second_running_harvest_status(self, name, _, kwargs, is_resume=False):
+    def assert_second_running_harvest_status(self, _, __, kwargs, is_resume=False):
         # Running harvest result message
         self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
         harvest_result_message = kwargs["body"]
@@ -216,7 +216,7 @@ class TestBaseHarvester(TestCase):
             }
         }, harvest_result_message["stats"])
 
-    def assert_running_harvest_status(self, warc_count, name, _, kwargs, is_resume=False, status=STATUS_RUNNING):
+    def assert_running_harvest_status(self, warc_count, _, __, kwargs, is_resume=False, status=STATUS_RUNNING):
         self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")
@@ -247,7 +247,7 @@ class TestBaseHarvester(TestCase):
     def assert_stopping_harvest_status(self, warc_count, name, _, kwargs, is_resume=False):
         self.assert_running_harvest_status(warc_count, name, _, kwargs, is_resume=is_resume, status=STATUS_STOPPING)
 
-    def assert_completed_harvest_status(self, warc_count, name, _, kwargs, is_resume=False):
+    def assert_completed_harvest_status(self, warc_count, _, __, kwargs, is_resume=False):
         self.assertEqual("harvest.status.test.test_usertimeline", kwargs["routing_key"])
         harvest_result_message = kwargs["body"]
         self.assertEqual(harvest_result_message["id"], "test:1")

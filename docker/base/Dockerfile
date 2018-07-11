@@ -1,5 +1,5 @@
-# Python 2.7
-FROM python@sha256:8907ce99826e948f535e9e2524225a8c5b2d273f2b223c7fe7d82e1fb41efdc3
+# Python 3.6
+FROM python@sha256:81782ff0fadf910a9f13747608f0d93e8938cbbdc1e50dc8c88e4e1ab8d9e7b2
 MAINTAINER Justin Littman <justinlittman@gwu.edu>
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -13,7 +13,7 @@ RUN set -x \
 	&& export GNUPGHOME="$(mktemp -d)" \
 	&& gpg --keyserver ha.pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 \
 	&& gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu \
-	&& rm -r "$GNUPGHOME" /usr/local/bin/gosu.asc \
+	&& rm -fr "$GNUPGHOME" /usr/local/bin/gosu.asc \
 	&& chmod +x /usr/local/bin/gosu \
 	&& gosu nobody true
 
@@ -21,10 +21,9 @@ RUN apt-get update && apt-get install -y \
     git \
     zip
 
-RUN pip install pip==10.0.1
 #Avoid the warning of https
 RUN pip install --upgrade ndg-httpsclient
-RUN pip install appdeps
+RUN pip install appdeps==1.1.0
 ENV SFM_REQS release
 ENV DEBUG false
 ADD setup_reqs.sh /opt/sfm-setup/

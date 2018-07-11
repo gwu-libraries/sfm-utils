@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from __future__ import absolute_import
 import socket
@@ -31,7 +31,7 @@ class StreamConsumer(BaseConsumer):
         # The queue will be unique to this instance of StreamServer so that it
         # will receive all stop requests
         if mq_config:
-            for queue, routing_keys in mq_config.queues.items():
+            for queue, routing_keys in list(mq_config.queues.items()):
                 mq_config.queues["_".join([queue, socket.gethostname()])] = [routing_key.replace("start", "stop")
                                                                              for routing_key in routing_keys]
             log.debug("Queues are now %s", mq_config.queues)
@@ -52,7 +52,6 @@ class StreamConsumer(BaseConsumer):
 
         signal.signal(signal.SIGTERM, shutdown)
         signal.signal(signal.SIGINT, shutdown)
-
 
     def on_message(self):
         harvest_id = self.message["id"]

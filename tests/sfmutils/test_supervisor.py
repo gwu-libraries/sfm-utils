@@ -6,7 +6,7 @@ import json
 import getpass
 from unittest import TestCase
 from mock import patch, MagicMock
-from xmlrpclib import ServerProxy
+from xmlrpc.client import ServerProxy
 from sfmutils.supervisor import HarvestSupervisor
 
 
@@ -19,7 +19,7 @@ class TestHarvestSupervisor(TestCase):
         if os.path.exists(self.working_path):
             shutil.rmtree(self.working_path)
 
-    @patch("sfmutils.supervisor.xmlrpclib.ServerProxy", autospec=True)
+    @patch("sfmutils.supervisor.xmlrpc.client.ServerProxy", autospec=True)
     def test_supervisor_start_and_stop(self, mock_server_proxy_class):
         message = {
             "id": "test:1",

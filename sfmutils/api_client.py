@@ -1,4 +1,4 @@
-import urlparse
+import urllib.parse as urlparse
 import requests
 
 

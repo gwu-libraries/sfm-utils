@@ -68,7 +68,7 @@ class TestBaseConsumer(tests.TestCase):
         exception_caught = False
         try:
             consumer._callback(self.message, mock_mq_message)
-        except:
+        except Exception:
             exception_caught = True
         self.assertTrue(exception_caught)
         self.assertTrue(consumer.on_message_called)

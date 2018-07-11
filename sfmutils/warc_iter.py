@@ -1,12 +1,10 @@
-from __future__ import absolute_import
-import sfmutils.warc as warc
+from warcio.archiveiterator import WARCIterator
 import json
 import argparse
 import logging
 import sys
 import os
 from collections import namedtuple
-from urllib3.exceptions import ProtocolError
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +23,7 @@ class BaseWarcIter:
     """
 
     def __init__(self, filepaths):
-        if isinstance(filepaths, basestring):
+        if isinstance(filepaths, str):
             self.filepaths = (filepaths,)
         else:
             self.filepaths = filepaths
@@ -55,61 +53,50 @@ class BaseWarcIter:
         for filepath in self.filepaths:
             log.info("Iterating over %s", filepath)
             filename = os.path.basename(filepath)
-            f = warc.WARCResponseFile(filepath)
-            yield_count = 0
-            for record_count, record in enumerate(f):
-                self._debug_counts(filename, record_count, yield_count, by_record_count=True)
+            with open(filepath, 'rb') as f:
+                yield_count = 0
+                for record_count, record in enumerate((r for r in WARCIterator(f) if r.rec_type == 'response')):
+                    self._debug_counts(filename, record_count, yield_count, by_record_count=True)
 
-                if self._select_record(record.url):
-                    # An iterator over json objects which constitute the payload of a record.
-                    if not self.line_oriented:
-                        # A non-line-oriented payload only has one payload part.
-                        payload_data = ""
-                        # Handles chunk encoding
-                        encoding_type = record.http_response.getheader('transfer-encoding')
-                        if encoding_type and encoding_type.lower() == "chunked":
-                            for line in record.http_response.read_chunked(decode_content=True):
-                                payload_data += line
-                        else:
-                            payload_data = record.http_response.data
-                        payload_parts_iter = [payload_data]
-                    else:
-                        # A line-oriented payload has many payload parts.
-                        payload_parts_iter = self._iter_lines(record.http_response)
-                    for payload_part in payload_parts_iter:
-                        json_obj = None
-                        if payload_part:
+                    record_url = record.rec_headers.get_header('WARC-Target-URI')
+                    record_id = record.rec_headers.get_header('WARC-Record-ID')
+                    if self._select_record(record_url):
+                        stream = record.content_stream()
+                        line = stream.readline().decode('utf-8')
+                        while line:
+                            json_obj = None
                             try:
                                 # A non-line-oriented payload only has one payload part.
-                                json_obj = json.loads(payload_part)
+                                json_obj = json.loads(line)
                             except ValueError:
-                                log.warn("Bad json in record %s: %s", record.header.record_id, payload_part)
-                        if json_obj:
-                            for item_type, item_id, item_date, item in self._item_iter(record.url, json_obj):
-                                # None for item_type indicates that the type is not handled. OK to ignore.
-                                if item_type is not None:
-                                    yield_item = True
-                                    if limit_item_types and item_type not in limit_item_types:
-                                        yield_item = False
-                                    if item_date_start and item_date and item_date < item_date_start:
-                                        yield_item = False
-                                    if item_date_end and item_date and item_date > item_date_end:
-                                        yield_item = False
-                                    if not self._select_item(item):
-                                        yield_item = False
-                                    if dedupe and yield_item:
-                                        if item_id in seen_ids:
+                                log.warning("Bad json in record %s: %s", record_id, line)
+                            if json_obj:
+                                for item_type, item_id, item_date, item in self._item_iter(record_url, json_obj):
+                                    # None for item_type indicates that the type is not handled. OK to ignore.
+                                    if item_type is not None:
+                                        yield_item = True
+                                        if limit_item_types and item_type not in limit_item_types:
                                             yield_item = False
-                                        else:
-                                            seen_ids[item_id] = True
-                                    if yield_item:
-                                        if item is not None:
-                                            yield_count += 1
-                                            self._debug_counts(filename, record_count, yield_count,
-                                                               by_record_count=False)
-                                            yield IterItem(item_type, item_id, item_date, record.url, item)
-                                        else:
-                                            log.warn("Bad response in record %s", record.header.record_id)
+                                        if item_date_start and item_date and item_date < item_date_start:
+                                            yield_item = False
+                                        if item_date_end and item_date and item_date > item_date_end:
+                                            yield_item = False
+                                        if not self._select_item(item):
+                                            yield_item = False
+                                        if dedupe and yield_item:
+                                            if item_id in seen_ids:
+                                                yield_item = False
+                                            else:
+                                                seen_ids[item_id] = True
+                                        if yield_item:
+                                            if item is not None:
+                                                yield_count += 1
+                                                self._debug_counts(filename, record_count, yield_count,
+                                                                   by_record_count=False)
+                                                yield IterItem(item_type, item_id, item_date, record_url, item)
+                                            else:
+                                                log.warn("Bad response in record %s", record_id)
+                            line = stream.readline().decode('utf-8')
 
     def _select_record(self, url):
         """
@@ -137,37 +124,6 @@ class BaseWarcIter:
         :returns item_type, item_id, item_date, item iterator
         """
         pass
-
-    @staticmethod
-    def _iter_lines(http_response):
-        """
-        Iterates over the response data, one line at a time.
-
-        Borrowed from https://github.com/kennethreitz/requests/blob/master/requests/models.py.
-        """
-        try:
-            pending = None
-
-            for chunk in http_response.stream(decode_content=True):
-
-                if pending is not None:
-                    chunk = pending + chunk
-
-                lines = chunk.splitlines()
-
-                if lines and lines[-1] and chunk and lines[-1][-1] == chunk[-1]:
-                    pending = lines.pop()
-                else:
-                    pending = None
-
-                for line in lines:
-                    yield line
-
-            if pending is not None:
-                yield pending
-        except ProtocolError:
-            # Last chunk incomplete
-            pass
 
     @staticmethod
     def item_types():

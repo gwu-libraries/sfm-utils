@@ -1,19 +1,19 @@
 # General
-pytz==2016.4
+pytz==2018.5
 # Testing
 mock==1.3.0
 vcrpy==1.7.4
 python-dateutil==2.4.2
 # Consumer
 kombu==4.0.2
-librabbitmq==1.6.1
+librabbitmq==2.0.0
 # Harvester
 petl==1.1.0
 xlsxwriter==0.9.4
 iso8601==0.1.11
-supervisor==3.2.0
+# Master support Py3, but no release.
+git+https://github.com/Supervisor/supervisor
 # Warc iter
-warc==0.2.1
-urllib3==1.12
+warcio==1.5.3
 # API client
-requests==2.9.1
+requests==2.19.1

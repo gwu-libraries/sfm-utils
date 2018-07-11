@@ -1,10 +1,9 @@
-from __future__ import absolute_import
 import getpass
 import os
 import stat
-from supervisor import xmlrpc
+from supervisor.xmlrpc import SupervisorTransport, Faults
 import time
-import xmlrpclib
+import xmlrpc
 import logging
 import json
 from sfmutils.utils import safe_string
@@ -116,7 +115,7 @@ stdout_logfile={log_path}/{safe_harvest_id}.out.log
         # Write the file
         conf_filepath = self._get_conf_filepath(harvest_id)
         log.debug("Writing conf to %s: %s", conf_filepath, contents)
-        with open(conf_filepath, "wb") as f:
+        with open(conf_filepath, "w") as f:
             f.write(contents)
         filestatus = os.stat(conf_filepath)
         # do a chmod +x, and add group write permissions
@@ -130,9 +129,9 @@ stdout_logfile={log_path}/{safe_harvest_id}.out.log
         return "{}/{}.json".format(self.conf_path, safe_string(harvest_id))
 
     def _get_supervisor_proxy(self):
-        return xmlrpclib.ServerProxy(
+        return xmlrpc.client.ServerProxy(
             "http://{}".format(self.internal_ip),
-            transport=xmlrpc.SupervisorTransport(
+            transport=SupervisorTransport(
                 None, None, "unix://{}".format(self.socket_file)))
 
     @staticmethod
@@ -144,8 +143,8 @@ stdout_logfile={log_path}/{safe_harvest_id}.out.log
         log.debug("Adding process group %s", process_group)
         try:
             self._get_supervisor_proxy().supervisor.addProcessGroup(process_group)
-        except xmlrpclib.Fault as e:
-            if e.faultCode != xmlrpc.Faults.ALREADY_ADDED:
+        except xmlrpc.client.Fault as e:
+            if e.faultCode != Faults.ALREADY_ADDED:
                 raise
             # else ignore - it's already added
             # but everything else, we want to raise
@@ -156,20 +155,20 @@ stdout_logfile={log_path}/{safe_harvest_id}.out.log
         log.debug("Removing process group %s", process_group)
         try:
             proxy.supervisor.stopProcess(process_group, True)
-        except xmlrpclib.Fault as e:
-            if e.faultCode == xmlrpc.Faults.BAD_NAME:
+        except xmlrpc.client.Fault as e:
+            if e.faultCode == Faults.BAD_NAME:
                 # process isn't known, so there's nothing to stop
                 # or remove
                 return
-            elif e.faultCode != xmlrpc.Faults.NOT_RUNNING:
+            elif e.faultCode != Faults.NOT_RUNNING:
                 raise
             # else ignore and proceed - it's already stopped
             # nothing to stop
         time.sleep(1)
         try:
             proxy.supervisor.removeProcessGroup(process_group)
-        except xmlrpclib.Fault as e:
-            if e.faultCode != xmlrpc.Faults.BAD_NAME:
+        except xmlrpc.client.Fault as e:
+            if e.faultCode != Faults.BAD_NAME:
                 raise
             # else do nothing - no such known process, so there's
             # nothing to remove

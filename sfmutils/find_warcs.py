@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from sfmutils.api_client import ApiClient
 import argparse
@@ -45,10 +45,10 @@ def main(sys_argv):
         else:
             collections = list(api_client.collections(collection_id_startswith=collection_id_part))
             if len(collections) == 0:
-                print "No matching collections for {}".format(collection_id_part)
+                print("No matching collections for {}".format(collection_id_part))
                 sys.exit(1)
             elif len(collections) > 1:
-                print "Multuple matching collections for {}".format(collection_id_part)
+                print("Multuple matching collections for {}".format(collection_id_part))
                 sys.exit(1)
             else:
                 collection_ids.append(collections[0]["collection_id"])
@@ -65,4 +65,4 @@ def main(sys_argv):
 
 
 if __name__ == "__main__":
-    print main(sys.argv)
+    print(main(sys.argv))

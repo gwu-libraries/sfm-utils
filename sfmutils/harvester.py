@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import logging
 import json
 import shutil
@@ -14,7 +13,7 @@ import codecs
 import uuid
 import iso8601
 from datetime import date
-from Queue import Queue, Empty
+from queue import Queue, Empty
 
 from sfmutils.consumer import BaseConsumer, MqConfig, EXCHANGE
 from sfmutils.state_store import JsonHarvestStateStore, DelayedSetStateStoreAdapter
@@ -418,7 +417,7 @@ class BaseHarvester(BaseConsumer):
                 "path": warc_path,
                 "date_created": datetime_from_stamp(os.path.getctime(warc_path)).isoformat(),
                 "bytes": os.path.getsize(warc_path),
-                "sha1": hashlib.sha1(open(warc_path).read()).hexdigest()
+                "sha1": hashlib.sha1(open(warc_path, 'rb').read()).hexdigest()
             }
         }
         self._publish_message("warc_created", message)
@@ -489,8 +488,6 @@ class BaseHarvester(BaseConsumer):
             # Make sure file exists. Possible that same file will be put in queue multiple times.
             warc_filepath = os.path.join(self.warc_temp_dir, warc_filename)
             if os.path.exists(warc_filepath):
-                log.info("Processing %s", warc_filename)
-
                 # Process the warc
                 self.process_warc(warc_filepath)
 
@@ -525,7 +522,6 @@ class BaseHarvester(BaseConsumer):
                 log.debug("Skipping processing %s", warc_filename)
             # Mark this as done.
             self.warc_processing_queue.task_done()
-        log.debug("Exiting warc processing thread")
 
     def on_persist_exception(self, exception):
         log.error("Handling on persist exception for %s", self.message["id"])
@@ -568,7 +564,6 @@ class BaseHarvester(BaseConsumer):
         :param queue: queue for the harvester
         :param routing_keys: list of routing keys for the harvester
         """
-
         # Logging
         logging.basicConfig(format='%(asctime)s: %(name)s --> %(message)s', level=logging.DEBUG)
 
@@ -606,10 +601,10 @@ class BaseHarvester(BaseConsumer):
         args = parser.parse_args()
 
         # Logging
-        logging.getLogger().setLevel(logging.DEBUG if args.debug else logging.INFO)
-        logging.getLogger("requests").setLevel(logging.debug if args.debug_http else logging.INFO)
-        logging.getLogger("requests_oauthlib").setLevel(logging.debug if args.debug_http else logging.INFO)
-        logging.getLogger("oauthlib").setLevel(logging.debug if args.debug_http else logging.INFO)
+        logging.getLogger("requests").setLevel(logging.DEBUG if args.debug_http else logging.INFO)
+        logging.getLogger("requests_oauthlib").setLevel(logging.DEBUG if args.debug_http else logging.INFO)
+        logging.getLogger("oauthlib").setLevel(logging.DEBUG if args.debug_http else logging.INFO)
+        logging.getLogger("urllib3").setLevel(logging.DEBUG if args.debug_http else logging.INFO)
 
         if args.command == "service":
             # Optionally add priority to queues

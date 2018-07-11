@@ -38,8 +38,7 @@ class TestFindWarcs(tests.TestCase):
         self.assertEqual("/sfm-data/abc123 /sfm-data/def456 /sfm-data/def789",
                          main("find_warcs.py --debug=True --harvest-start 2015-02-22T14:49:07Z --harvest-end "
                               "2016-02-22T14:49:07Z --warc-end 2014-02-22T14:49:07Z --warc-start "
-                              "2013-02-22T14:49:07Z abcdefghijklmnopqrstuvwxyz012345 def".split(
-                             " ")))
+                              "2013-02-22T14:49:07Z abcdefghijklmnopqrstuvwxyz012345 def".split(" ")))
         self.assertEqual([call(collection_id_startswith='def')],
                          mock_api_client.collections.call_args_list)
         self.assertEqual(
