@@ -2,10 +2,10 @@ from setuptools import setup
 
 setup(
     name='sfmutils',
-    version='1.12.0',
+    version='2.0.0',
     url='https://github.com/gwu-libraries/sfm-utils',
-    author='Justin Littman',
-    author_email='justinlittman@gmail.com',
+    author='Social Feed Manager',
+    author_email='sfm@gwu.edu',
     packages=['sfmutils'],
     description="Utilities to support Social Feed Manager.",
     platforms=['POSIX'],
@@ -25,7 +25,7 @@ setup(
     classifiers=[
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries :: Python Modules',
-        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
         'Development Status :: 4 - Beta',
     ],
 )
