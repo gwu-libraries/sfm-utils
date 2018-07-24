@@ -5,7 +5,7 @@ install: pip install -r requirements/requirements.txt
 script: python -m unittest discover
 notifications:
   email:
-  - justinlittman@gmail.com
+  - sfm@gwu.edu
   slack:
     secure: Q5KelUKQUX1h4v78vk1UZflgppBB8iXe5wqMerEdYA1qr6bT+uHDtD2BtBswmEl7OWCeYZpSHZvqWkM7AciXRx1bNvhyj+7bBbnL0hfcdmZZ+20ASjVy8ymllpGTFv9am+1ppfRGBEgd6GkbQM+E8e0gXnh4u+bLO07AnH4WxRuH6PFyI4oxvaGN3xZ4qJxA3kjXhX/OpRAFo5ENSFKJfLAhFp0vzymze4exVCrKIwZWEwn58DTCP0/aqWFCeLmpwoxXjjxBWFXVr+c5ZbfffkaC7CivZXxHR1OpHCxuYpSK/BxO8sYvfM03oZYMBqWkbh2vJA/dLlsy+DFjvNumXjoFV2MPdt1uZ3fBsTQ3v9BwbDvZQxxVJi0/kQ/8dn1hIbFknmLf7JqwKZFQjL8NEI6yH8EIB/BH2HgWygZAACTBy4BPQALn86PuIpKqP79XHyNgeWi9P+vjL4sS55vZCQH3CdJH5Zkgn+exojWM4L727IMXROye2Hep01pTMjstjV20JRHflbB2vuKOoD29VUvGfCE9sElayFCdmLlIQ8ABB86B/bf0Lk9BXEPvLxwuCNf2P9U+qXa3bZkoTfo69ImD1f7LdJi8U7kr+ZQCldbhxV7WBKh9s/BJjZqBjJJNHZjHs7+rFWqqzOpOj6fmx2byhNOnkcRD0TO8yXbNw+s=
     on_success: never
