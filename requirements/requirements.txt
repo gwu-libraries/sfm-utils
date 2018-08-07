@@ -1,2 +1,2 @@
 -r common.txt
-git+https://github.com/gwu-libraries/warcprox.git@2.4b3-gwu#egg=warcprox
+git+https://github.com/gwu-libraries/warcprox.git@2.4b4-gwu#egg=warcprox
