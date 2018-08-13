@@ -131,7 +131,7 @@ class warced:
             port += 1
 
     def _generate_commandline(self):
-        cl = "warcprox -c {} --certs-dir {} --dedup-db-file /dev/null --stats-db-file /dev/null --max-threads=1 " \
+        cl = "warcprox -c {} --certs-dir {} --dedup-db-file /dev/null --stats-db-file /dev/null " \
              "-d {} -n {} -p {}".format(
                 self.ca_bundle,
                 self.ca_dir,
