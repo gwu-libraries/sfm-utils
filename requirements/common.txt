@@ -16,4 +16,6 @@ git+https://github.com/Supervisor/supervisor
 # Warc iter
 warcio==1.5.3
 # API client
-requests==2.19.1
+requests==2.21.0
+# Need to hold back idna for the sake of urlcanon 2.0 (needed by warcprox)
+idna==2.7
