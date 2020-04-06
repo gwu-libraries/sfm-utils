@@ -11,7 +11,7 @@ setup(
     platforms=['POSIX'],
     test_suite='tests',
     scripts=['sfmutils/stream_consumer.py', 'sfmutils/find_warcs.py'],
-    install_requires=['pytz==2019.1',
+    install_requires=['pytz==2019.3',
                       'requests==2.22.0',
                       'kombu==4.0.2',
                       'librabbitmq==2.0.0',
