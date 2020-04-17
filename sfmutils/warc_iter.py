@@ -66,8 +66,9 @@ class BaseWarcIter:
                         while line:
                             json_obj = None
                             try:
-                                # A non-line-oriented payload only has one payload part.
-                                json_obj = json.loads(line)
+                                if line != "\r\n":
+                                    # A non-line-oriented payload only has one payload part.
+                                    json_obj = json.loads(line)
                             except ValueError:
                                 log.warning("Bad json in record %s: %s", record_id, line)
                             if json_obj:
