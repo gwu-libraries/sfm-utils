@@ -48,7 +48,7 @@ def main(sys_argv):
                 print("No matching collections for {}".format(collection_id_part))
                 sys.exit(1)
             elif len(collections) > 1:
-                print("Multuple matching collections for {}".format(collection_id_part))
+                print("Multiple matching collections for {}".format(collection_id_part))
                 sys.exit(1)
             else:
                 collection_ids.append(collections[0]["collection_id"])

@@ -114,7 +114,7 @@ class NullHarvestStateStore:
 class DelayedSetStateStoreAdapter:
     """
     An adapter for a state store that keeps track of sets and delays
-    passing them on the the underlying state store.
+    passing them on the underlying state store.
     """
     def __init__(self, state_store):
         self.state_store = state_store
