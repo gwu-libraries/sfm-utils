@@ -47,7 +47,7 @@ class DictHarvestStateStore:
         :param value: Value for the state that is being stored.  None to delete an existing value.
         """
         if self.verbose:
-            log.debug("Setting state for %s with key %s to %s", resource_type, key, value)
+            log.debug("Setting state for %s with key %s to %.200s", resource_type, key, value)
         if value is not None:
             if resource_type not in self.state:
                 self.state[resource_type] = {}
