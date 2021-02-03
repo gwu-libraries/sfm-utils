@@ -133,4 +133,4 @@ class DelayedSetStateStoreAdapter:
         for resource_type, key_values in self.delayed_state.state.items():
             for key, value in key_values.items():
                 self.state_store.set_state(resource_type, key, value)
-        self.delayed_state = DictHarvestStateStore()
+        self.delayed_state = DictHarvestStateStore(verbose=False)
