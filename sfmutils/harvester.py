@@ -69,7 +69,7 @@ class HarvestResult(BaseResult):
 
     def stats(self):
         """
-        Returns ordered dictinary of day to stats.
+        Returns ordered dictionary of day to stats.
         """
         return self._stats
 
@@ -114,7 +114,7 @@ class BaseHarvester(BaseConsumer):
     Note that streams should only be harvested from a file as this does not support
     harvest stop messages. (See sfm-utils.stream_consumer.StreamConsumer.)
 
-    Subclasses should overrride harvest_seeds().
+    Subclasses should override harvest_seeds().
     """
 
     def __init__(self, working_path, mq_config=None, stream_restart_interval_secs=30 * 60, debug=False,
