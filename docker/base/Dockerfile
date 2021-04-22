@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
     git \
     zip
 
+RUN pip install --upgrade pip
 #Avoid the warning of https
 RUN pip install --upgrade ndg-httpsclient
 RUN pip install appdeps==1.1.0
