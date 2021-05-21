@@ -2,7 +2,7 @@
 
 groupadd -r sfm --gid=$SFM_GID && useradd -r -m -g sfm --uid=$SFM_UID sfm
 
-export CONTAINER_DIR=/sfm-data/containers/$HOSTNAME
+export CONTAINER_DIR=/sfm-containers-data/containers/$HOSTNAME
 if [ ! -d $CONTAINER_DIR ]; then
     echo "Creating container directory"
     mkdir -p $CONTAINER_DIR
