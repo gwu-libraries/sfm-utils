@@ -5,7 +5,7 @@ MAINTAINER Social Feed Manager <sfm@gwu.edu>
 ADD start.sh /usr/local/bin/mq_start.sh
 RUN chmod +x /usr/local/bin/mq_start.sh
 
-ENV RABBITMQ_MNESIA_BASE /sfm-data/rabbitmq
-ENV RABBITMQ_LOG_BASE /sfm-data/rabbitmq
+ENV RABBITMQ_MNESIA_BASE /sfm-mq-data/rabbitmq
+ENV RABBITMQ_LOG_BASE /sfm-mq-data/rabbitmq
 
 ENTRYPOINT ["/usr/local/bin/mq_start.sh"]
