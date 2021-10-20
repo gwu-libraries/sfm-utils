@@ -5,7 +5,7 @@ mock==2.0.0
 vcrpy==2.0.1
 python-dateutil==2.7.5
 # Consumer
-kombu==4.0.2
+kombu==4.6.11
 librabbitmq==2.0.0
 # Harvester
 petl==1.2.0
