@@ -165,7 +165,7 @@ class BaseWarcIter:
         # Logging
         logging.getLogger().setLevel(logging.DEBUG if args.debug else logging.INFO)
 
-        main_limit_item_types = args.item_types.split(",") if "item_types" in vars(args) else None
+        main_limit_item_types = args.item_types.split(",") if vars(args).get('item_types') else None
 
         cls(args.filepaths).print_iter(limit_item_types=main_limit_item_types, pretty=args.pretty,
                                        print_item_type=args.print_item_type, dedupe=args.dedupe)
