@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='sfmutils',
-    version='2.4.0',
+    version='2.5.0',
     url='https://github.com/gwu-libraries/sfm-utils',
     author='Social Feed Manager',
     author_email='sfm@gwu.edu',
