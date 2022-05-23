@@ -108,7 +108,7 @@ class warced:
 
     def _set_envs(self):
         os.environ["HTTP_PROXY"] = "http://localhost:{}".format(self.port)
-        os.environ["HTTPS_PROXY"] = "https://localhost:{}".format(self.port)
+        os.environ["HTTPS_PROXY"] = "http://localhost:{}".format(self.port)
         os.environ["REQUESTS_CA_BUNDLE"] = self.ca_bundle
 
     def _unset_envs(self):

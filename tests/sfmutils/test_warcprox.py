@@ -20,7 +20,7 @@ class WarcedTest(TestCase):
         w = warced(None, None, port=1234)
         w._set_envs()
         self.assertEqual("http://localhost:1234", os.environ["HTTP_PROXY"])
-        self.assertEqual("https://localhost:1234", os.environ["HTTPS_PROXY"])
+        self.assertEqual("http://localhost:1234", os.environ["HTTPS_PROXY"])
 
         w._unset_envs()
         self.assertIsNone(os.environ.get("HTTP_PROXY"))
