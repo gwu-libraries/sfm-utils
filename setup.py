@@ -11,7 +11,7 @@ setup(
     platforms=['POSIX'],
     test_suite='tests',
     scripts=['sfmutils/stream_consumer.py', 'sfmutils/find_warcs.py'],
-    install_requires=['pytz==2019.3',
+    install_requires=['pytz==2022.1',
                       'requests==2.22.0',
                       'kombu==4.6.11',
                       'librabbitmq==2.0.0',
@@ -22,7 +22,7 @@ setup(
                       'idna==2.7'],
     tests_require=['mock==2.0.0',
                    'vcrpy==2.0.1',
-                   'python-dateutil==2.7.5'],
+                   'python-dateutil==2.8.2'],
     classifiers=[
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries :: Python Modules',

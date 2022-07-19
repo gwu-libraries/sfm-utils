@@ -1,9 +1,9 @@
 # General
-pytz==2019.3
+pytz==2022.1
 # Testing
 mock==2.0.0
 vcrpy==2.0.1
-python-dateutil==2.7.5
+python-dateutil==2.8.2
 # Consumer
 kombu==4.6.11
 librabbitmq==2.0.0
