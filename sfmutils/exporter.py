@@ -373,10 +373,11 @@ def to_lineoriented_json(table, source):
     """
     source = write_source_from_arg(source)
     encoder = DateEncoder()
-    with source.open("wb") as f:
+    with source.open("w") as f:
         for d in _dicts(table):
-            for chunk in encoder.iterencode(d):
-                f.write(chunk)
+            #for chunk in encoder.iterencode(d):
+            #    f.write(chunk)
+            f.write(encoder.encode(d))
             f.write("\n")
 
 
