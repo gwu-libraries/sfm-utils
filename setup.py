@@ -17,7 +17,7 @@ setup(
                       'librabbitmq==2.0.0',
                       'warcio==1.5.3',
                       'iso8601==0.1.12',
-                      'petl==1.2.0',
+                      'petl==1.6.8',
                       'xlsxwriter==1.1.2',
                       'idna==2.7'],
     tests_require=['mock==2.0.0',
