@@ -12,7 +12,7 @@ setup(
     test_suite='tests',
     scripts=['sfmutils/stream_consumer.py', 'sfmutils/find_warcs.py'],
     install_requires=['pytz==2022.1',
-                      'requests==2.22.0',
+                      'requests==2.31.0',
                       'kombu==4.6.11',
                       'librabbitmq==2.0.0',
                       'warcio==1.5.3',
